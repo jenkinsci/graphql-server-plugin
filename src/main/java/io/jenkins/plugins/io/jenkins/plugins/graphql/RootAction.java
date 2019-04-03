@@ -67,11 +67,13 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         }
     }
     public static class Query {
-        @GraphQLQuery
-        public List<Job> allJobs(
+        @GraphQLQuery(name = "allJobs")
+        public List<String> allJobs(/*
                 JobFilter filter,
                 @GraphQLArgument(name="skip", defaultValue="0") Number skip,
-                @GraphQLArgument(name="limit", defaultValue="0") Number limit) {
+                @GraphQLArgument(name="limit", defaultValue="0") Number limit
+            */) {
+            LOGGER.info("allJobs");
             return Collections.emptyList();
         }
     }
@@ -79,7 +81,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         Query query = new Query();
 
         return new GraphQLSchemaGenerator()
-                .withOperationsFromSingleton(query)
+                .withOperationsFromSingleton(query, Query.class)
                 .generate();
     }
 
@@ -90,23 +92,16 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         StaplerResponse res = Stapler.getCurrentResponse();
         // Get the POST stream
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
-        if (!body.isEmpty()) {
+        if (body.isEmpty()) {
             throw new Error("No body");
         }
-        String schema = "type Query{MagicSchool: String}";
-        LOGGER.info(body);
+
+        LOGGER.info("Body: " + body);
         JSONObject jsonRequest = JSONObject.fromObject(body);;
 
-        SchemaParser schemaParser = new SchemaParser();
-        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
-
-        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
-                .type("Query", builder -> builder.dataFetcher("MagicSchool", new StaticDataFetcher("Hogwards")))
-                .build();
-
-        SchemaGenerator schemaGenerator = new SchemaGenerator();
-        GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
-        GraphQL build = GraphQL.newGraphQL(graphQLSchema).build();
+        /* START - One time generation */
+        GraphQL build = GraphQL.newGraphQL(buildSchema()).build();
+        /* END - One time generation */
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(jsonRequest.getString("query")).build();
         ExecutionResult executionResult = build.execute(executionInput);
