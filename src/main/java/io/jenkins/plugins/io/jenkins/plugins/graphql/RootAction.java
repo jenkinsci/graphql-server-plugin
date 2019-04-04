@@ -15,6 +15,7 @@ import graphql.schema.idl.TypeRuntimeWiring;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
 import hudson.model.Actionable;
+import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.TopLevelItem;
 import hudson.model.TopLevelItemDescriptor;
@@ -99,7 +100,11 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
                             .dataFetcher("allJobs", new DataFetcher() {
                                 @Override
                                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                                    return Jenkins.getInstanceOrNull().getAllItems(Job.class);
+                                    return Items.allItems(
+                                            Jenkins.getAuthentication(),
+                                            Jenkins.getInstanceOrNull(),
+                                            Job.class
+                                    );
                                 }
                             });
                     for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
@@ -107,7 +112,11 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
                             builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), new DataFetcher() {
                                 @Override
                                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                                    return Jenkins.getInstanceOrNull().getAllItems(d.clazz);
+                                    return Items.allItems(
+                                            Jenkins.getAuthentication(),
+                                            Jenkins.getInstanceOrNull(),
+                                            d.clazz
+                                    );
                                 }
                             });
                         }
