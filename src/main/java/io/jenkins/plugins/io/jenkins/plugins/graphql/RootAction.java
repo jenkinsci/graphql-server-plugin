@@ -1,41 +1,47 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
+import graphql.schema.DataFetcher;
+import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.StaticDataFetcher;
 import graphql.schema.idl.RuntimeWiring;
 import graphql.schema.idl.SchemaGenerator;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
+import graphql.schema.idl.TypeRuntimeWiring;
+import hudson.DescriptorExtensionList;
 import hudson.Extension;
-import hudson.ExtensionList;
 import hudson.model.Actionable;
 import hudson.model.Job;
-import io.leangen.graphql.GraphQLSchemaGenerator;
-import io.leangen.graphql.annotations.GraphQLArgument;
-import io.leangen.graphql.annotations.GraphQLQuery;
+import hudson.model.TopLevelItem;
+import hudson.model.TopLevelItemDescriptor;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.apache.commons.io.IOUtils;
+import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
-import org.kohsuke.stapler.interceptor.RequirePOST;
-import org.kohsuke.stapler.Stapler;
+import org.kohsuke.stapler.export.Model;
+import org.kohsuke.stapler.export.ModelBuilder;
+import org.kohsuke.stapler.export.Property;
+
 import javax.annotation.CheckForNull;
-import javax.management.Query;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 @Extension
 public class RootAction extends Actionable implements hudson.model.RootAction {
     private final static Logger LOGGER = Logger.getLogger(RootAction.class.getName());
+    private static GraphQL builtSchema;
+    /*package*/ static ModelBuilder MODEL_BUILDER = new ModelBuilder();
+    private static final HashMap<String, String> javaTypesToGraphqlTypes = new HashMap<>();
 
     @CheckForNull
     @Override
@@ -55,35 +61,109 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         return "graphql";
     }
 
-    public class JobFilter {
-        private String nameContains;
+    // @Initializer(after = InitMilestone.JOB_LOADED)
+    public static void init() {
+        javaTypesToGraphqlTypes.put("boolean", "Boolean");
+        javaTypesToGraphqlTypes.put("string", "String");
+        javaTypesToGraphqlTypes.put("float", "Float");
+        javaTypesToGraphqlTypes.put("integer", "Int");
+        javaTypesToGraphqlTypes.put("int", "Int");
 
-        @JsonProperty("name_contains")
-        public String getNameContains() {
-            return nameContains;
-        }
+        StringBuilder queryBuilder = new StringBuilder();
+        StringBuilder typesBuilder = new StringBuilder();
 
-        public void setNameContains(String nameContains) {
-            this.nameContains = nameContains;
+        queryBuilder.append("allJobs: [Job]\n");
+        typesBuilder.append(buildSchemaFromClass(Job.class).toString());
+
+        for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
+            if (Job.class.isAssignableFrom(d.clazz)) {
+                queryBuilder.append("all" + d.clazz.getSimpleName() + ": [" + d.clazz.getSimpleName() + "]\n");
+                typesBuilder.append(buildSchemaFromClass(d.clazz).toString());
+            }
         }
+        String schema = "schema {\n" +
+                "    query: QueryType\n" +
+                "}\n" +
+                "type QueryType {\n" +
+                    queryBuilder.toString() + "\n" +
+                "}\n" +
+                typesBuilder.toString() + "\n";
+
+        LOGGER.info("Schema: " + schema);
+        // if (!schema.isEmpty()) { throw new Error(schema); }
+        SchemaParser schemaParser = new SchemaParser();
+        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
+        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
+                .type("QueryType", typeWiring -> {
+                    TypeRuntimeWiring.Builder builder = typeWiring
+                            .dataFetcher("allJobs", new DataFetcher() {
+                                @Override
+                                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
+                                    return Jenkins.getInstanceOrNull().getAllItems(Job.class);
+                                }
+                            });
+                    for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
+                        if (Job.class.isAssignableFrom(d.clazz)) {
+                            builder = builder.dataFetcher(d.clazz.getSimpleName(), new DataFetcher() {
+                                @Override
+                                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
+                                    return Jenkins.getInstanceOrNull().getAllItems(d.clazz);
+                                }
+                            });
+                        }
+                    }
+                    return builder;
+                }).build();
+
+        SchemaGenerator schemaGenerator = new SchemaGenerator();
+        GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
+        builtSchema = GraphQL.newGraphQL(graphQLSchema).build();
     }
-    public static class Query {
-        @GraphQLQuery(name = "allJobs")
-        public List<String> allJobs(/*
-                JobFilter filter,
-                @GraphQLArgument(name="skip", defaultValue="0") Number skip,
-                @GraphQLArgument(name="limit", defaultValue="0") Number limit
-            */) {
-            LOGGER.info("allJobs");
-            return Collections.emptyList();
-        }
-    }
-    private static GraphQLSchema buildSchema() {
-        Query query = new Query();
 
-        return new GraphQLSchemaGenerator()
-                .withOperationsFromSingleton(query, Query.class)
-                .generate();
+    private static StringBuilder buildSchemaFromClass(Class clazz) {
+        StringBuilder typeBuilder = new StringBuilder();
+        typeBuilder.append("type " + clazz.getSimpleName() + " {\n");
+        Model<? extends TopLevelItem> model = MODEL_BUILDER.get(clazz);
+        typeBuilder.append(createSchema(model));
+        typeBuilder.append("\n");
+        typeBuilder.append("}\n");
+        return typeBuilder;
+    }
+
+    private static String createSchema(Model<?> model) {
+        StringBuilder sb = new StringBuilder();
+        if (model.superModel != null) {
+            sb.append(createSchema(model.superModel));
+        }
+        for (Property p : model.getProperties()) {
+            Class t = p.getType();
+            if (t.isPrimitive() ||
+                    t.isAssignableFrom(String.class) ||
+                    t.isAssignableFrom(Integer.class) ||
+                    t.isAssignableFrom(Long.class) ||
+                    t.isAssignableFrom(Double.class) ||
+                    t.isAssignableFrom(Float.class) ||
+                    t.isAssignableFrom(Boolean.class) ||
+                    t.isAssignableFrom(Character.class) ||
+                    t.isAssignableFrom(Byte.class) ||
+                    t.isAssignableFrom(Void.class) ||
+                    t.isAssignableFrom(Short.class)
+            ) {
+                sb.append(p.name);
+                sb.append(":");
+                sb.append(javaTypesToGraphqlTypes.getOrDefault(t.getSimpleName(), t.getSimpleName()));
+                sb.append("\n");
+            } else if (t.isArray()) {
+                if (t.getComponentType().isPrimitive()) {
+                    sb.append(p.name);
+                    sb.append(": [");
+                    sb.append(javaTypesToGraphqlTypes.getOrDefault(t.getComponentType().getSimpleName(), t.getComponentType().getSimpleName()));
+                    sb.append("]\n");
+                }
+
+            }
+        }
+        return sb.toString();
     }
 
     @SuppressWarnings("unused")
@@ -93,20 +173,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         StaplerResponse res = Stapler.getCurrentResponse();
 
         /* START - One time generation */
-        String schema = "type Query{MagicSchool: String}";
-        ExtensionList<Job> jobsTypes = ExtensionList.lookup(hudson.model.Job.class);
-
-        if (jobsTypes.size() > -1) {
-            throw new Error(new Integer(jobsTypes.size()).toString());
-        }
-
-        SchemaParser schemaParser = new SchemaParser();
-        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
-        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring().type("Query", builder -> builder.dataFetcher("MagicSchool", new StaticDataFetcher("Hogwards"))).build();
-
-        SchemaGenerator schemaGenerator = new SchemaGenerator();
-        GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
-        GraphQL build = GraphQL.newGraphQL(graphQLSchema).build();
+        /* FIXME */ init();
         /* END - One time generation */
 
         // Get the POST stream
@@ -119,7 +186,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         JSONObject jsonRequest = JSONObject.fromObject(body);;
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(jsonRequest.getString("query")).build();
-        ExecutionResult executionResult = build.execute(executionInput);
+        ExecutionResult executionResult = builtSchema.execute(executionInput);
 
         ServletOutputStream outputStream = res.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");

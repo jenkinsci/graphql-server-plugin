@@ -37,11 +37,6 @@
             <artifactId>graphql-java</artifactId>
             <version>2019-04-03T06-16-20-800ea0d</version>
         </dependency>
-        <dependency>
-            <groupId>io.leangen.graphql</groupId>
-            <artifactId>spqr</artifactId>
-            <version>0.9.1</version>
-        </dependency>
     </dependencies>
 
     <repositories>
