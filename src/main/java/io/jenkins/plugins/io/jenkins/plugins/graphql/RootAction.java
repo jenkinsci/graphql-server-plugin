@@ -104,7 +104,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
                             });
                     for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
                         if (Job.class.isAssignableFrom(d.clazz)) {
-                            builder = builder.dataFetcher(d.clazz.getSimpleName(), new DataFetcher() {
+                            builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), new DataFetcher() {
                                 @Override
                                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                                     return Jenkins.getInstanceOrNull().getAllItems(d.clazz);
