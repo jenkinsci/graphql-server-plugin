@@ -11,6 +11,7 @@ import graphql.schema.idl.SchemaGenerator;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import hudson.Extension;
+import hudson.ExtensionList;
 import hudson.model.Actionable;
 import hudson.model.Job;
 import io.leangen.graphql.GraphQLSchemaGenerator;
@@ -90,6 +91,24 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
     public void doIndex() throws IOException, ServletException {
         StaplerRequest req = Stapler.getCurrentRequest();
         StaplerResponse res = Stapler.getCurrentResponse();
+
+        /* START - One time generation */
+        String schema = "type Query{MagicSchool: String}";
+        ExtensionList<Job> jobsTypes = ExtensionList.lookup(hudson.model.Job.class);
+
+        if (jobsTypes.size() > -1) {
+            throw new Error(new Integer(jobsTypes.size()).toString());
+        }
+
+        SchemaParser schemaParser = new SchemaParser();
+        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
+        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring().type("Query", builder -> builder.dataFetcher("MagicSchool", new StaticDataFetcher("Hogwards"))).build();
+
+        SchemaGenerator schemaGenerator = new SchemaGenerator();
+        GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
+        GraphQL build = GraphQL.newGraphQL(graphQLSchema).build();
+        /* END - One time generation */
+
         // Get the POST stream
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
         if (body.isEmpty()) {
@@ -98,10 +117,6 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
 
         LOGGER.info("Body: " + body);
         JSONObject jsonRequest = JSONObject.fromObject(body);;
-
-        /* START - One time generation */
-        GraphQL build = GraphQL.newGraphQL(buildSchema()).build();
-        /* END - One time generation */
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(jsonRequest.getString("query")).build();
         ExecutionResult executionResult = build.execute(executionInput);
