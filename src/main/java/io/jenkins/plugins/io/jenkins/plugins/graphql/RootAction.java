@@ -31,13 +31,16 @@ import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
+import org.kohsuke.stapler.export.TypeUtil;
 
 import javax.annotation.CheckForNull;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.logging.Logger;
 
 @Extension
@@ -154,38 +157,54 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         return typeBuilder;
     }
 
+    private static String createSchemaClassName(Property p, Class clazz) {
+        if (clazz.isPrimitive() ||
+            clazz.isAssignableFrom(String.class) ||
+            clazz.isAssignableFrom(Integer.class) ||
+            clazz.isAssignableFrom(Long.class) ||
+            clazz.isAssignableFrom(Double.class) ||
+            clazz.isAssignableFrom(Float.class) ||
+            clazz.isAssignableFrom(Boolean.class) ||
+            clazz.isAssignableFrom(Character.class) ||
+            clazz.isAssignableFrom(Byte.class) ||
+            clazz.isAssignableFrom(Void.class) ||
+            clazz.isAssignableFrom(Short.class)
+        ) {
+            return javaTypesToGraphqlTypes.getOrDefault(clazz.getSimpleName(), clazz.getSimpleName());
+        }
+        return null;
+    }
+
     private static String createSchema(Model<?> model) {
         StringBuilder sb = new StringBuilder();
         if (model.superModel != null) {
             sb.append(createSchema(model.superModel));
         }
         for (Property p : model.getProperties()) {
-            Class t = p.getType();
-            if (t.isPrimitive() ||
-                    t.isAssignableFrom(String.class) ||
-                    t.isAssignableFrom(Integer.class) ||
-                    t.isAssignableFrom(Long.class) ||
-                    t.isAssignableFrom(Double.class) ||
-                    t.isAssignableFrom(Float.class) ||
-                    t.isAssignableFrom(Boolean.class) ||
-                    t.isAssignableFrom(Character.class) ||
-                    t.isAssignableFrom(Byte.class) ||
-                    t.isAssignableFrom(Void.class) ||
-                    t.isAssignableFrom(Short.class)
-            ) {
-                sb.append(p.name);
-                sb.append(":");
-                sb.append(javaTypesToGraphqlTypes.getOrDefault(t.getSimpleName(), t.getSimpleName()));
-                sb.append("\n");
-            } else if (t.isArray()) {
-                if (t.getComponentType().isPrimitive()) {
-                    sb.append(p.name);
-                    sb.append(": [");
-                    sb.append(javaTypesToGraphqlTypes.getOrDefault(t.getComponentType().getSimpleName(), t.getComponentType().getSimpleName()));
-                    sb.append("]\n");
-                }
+            Class clazz = p.getType();
 
+
+            String className = null;
+            if (clazz.isInstance(Object[].class)) {
+                className = createSchemaClassName(p, clazz.getComponentType());
+                if (className != null) {
+                    className = "[" + className + "]";
+                }
             }
+            else if (Collection.class.isAssignableFrom(clazz)) {
+                className = createSchemaClassName(p, TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class),0)));
+                if (className != null) {
+                    className = "[" + className + "]";
+                }
+            } else {
+                className = createSchemaClassName(p, clazz);
+            }
+
+            if (className == null) { continue; }
+            sb.append(p.name);
+            sb.append(":");
+            sb.append(className);
+            sb.append("\n");
         }
         return sb.toString();
     }
