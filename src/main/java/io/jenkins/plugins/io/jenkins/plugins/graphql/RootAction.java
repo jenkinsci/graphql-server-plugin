@@ -3,15 +3,18 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
+import graphql.language.FieldDefinition;
 import graphql.schema.DataFetcher;
+import graphql.schema.DataFetcherFactory;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLSchema;
-import graphql.schema.StaticDataFetcher;
+import graphql.schema.idl.FieldWiringEnvironment;
 import graphql.schema.idl.RuntimeWiring;
 import graphql.schema.idl.SchemaGenerator;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import graphql.schema.idl.TypeRuntimeWiring;
+import graphql.schema.idl.WiringFactory;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
 import hudson.model.Actionable;
@@ -62,6 +65,27 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         return "graphql";
     }
 
+    public static class ClassWiringFactory implements WiringFactory {
+        @Override
+        public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
+            FieldDefinition fieldDef = environment.getFieldDefinition();
+            if ("_class".equals(fieldDef.getName())) {
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
+            return environment1 -> new DataFetcher<T>() {
+                @Override
+                public T get(DataFetchingEnvironment environment1) throws Exception {
+                    return (T) environment1.getSource().getClass().getName();
+                }
+            };
+        }
+    }
+
     // @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() {
         javaTypesToGraphqlTypes.put("boolean", "Boolean");
@@ -87,7 +111,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
                 "}\n" +
                 "type QueryType {\n" +
                     queryBuilder.toString() + "\n" +
-                "}\n" +
+                "}\nscalar Class\n\n" +
                 typesBuilder.toString() + "\n";
 
         LOGGER.info("Schema: " + schema);
@@ -95,30 +119,21 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         SchemaParser schemaParser = new SchemaParser();
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
         RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
+                .wiringFactory(new ClassWiringFactory())
                 .type("QueryType", typeWiring -> {
                     TypeRuntimeWiring.Builder builder = typeWiring
-                            .dataFetcher("allJobs", new DataFetcher() {
-                                @Override
-                                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                                    return Items.allItems(
-                                            Jenkins.getAuthentication(),
-                                            Jenkins.getInstanceOrNull(),
-                                            Job.class
-                                    );
-                                }
-                            });
+                            .dataFetcher("allJobs", dataFetchingEnvironment -> Items.allItems(
+                                    Jenkins.getAuthentication(),
+                                    Jenkins.getInstanceOrNull(),
+                                    Job.class
+                            ));
                     for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
                         if (Job.class.isAssignableFrom(d.clazz)) {
-                            builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), new DataFetcher() {
-                                @Override
-                                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                                    return Items.allItems(
-                                            Jenkins.getAuthentication(),
-                                            Jenkins.getInstanceOrNull(),
-                                            d.clazz
-                                    );
-                                }
-                            });
+                            builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), dataFetchingEnvironment -> Items.allItems(
+                                    Jenkins.getAuthentication(),
+                                    Jenkins.getInstanceOrNull(),
+                                    d.clazz
+                            ));
                         }
                     }
                     return builder;
@@ -131,7 +146,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
 
     private static StringBuilder buildSchemaFromClass(Class clazz) {
         StringBuilder typeBuilder = new StringBuilder();
-        typeBuilder.append("type " + clazz.getSimpleName() + " {\n");
+        typeBuilder.append("type " + clazz.getSimpleName() + " { \n_class: String!\n");
         Model<? extends TopLevelItem> model = MODEL_BUILDER.get(clazz);
         typeBuilder.append(createSchema(model));
         typeBuilder.append("\n");
