@@ -42,3 +42,5 @@ buildNumber.properties
 # End of https://www.gitignore.io/api/java,maven
 
 work/
+*.iml
+.idea
