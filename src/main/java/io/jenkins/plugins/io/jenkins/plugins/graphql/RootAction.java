@@ -111,7 +111,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
                 "}\n" +
                 "type QueryType {\n" +
                     queryBuilder.toString() + "\n" +
-                "}\nscalar Class\n\n" +
+                "}\n" +
                 typesBuilder.toString() + "\n";
 
         LOGGER.info("Schema: " + schema);
