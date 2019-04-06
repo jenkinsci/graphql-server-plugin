@@ -18,6 +18,7 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import javax.annotation.Nonnull;
 import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -173,6 +174,9 @@ public class GraphQLSchemaGenerator {
             sb.append(p.name);
             sb.append(": ");
             sb.append(className);
+            if (propertyClazz.isAnnotationPresent(Nonnull.class)) {
+                sb.append("!");
+            }
             sb.append("\n");
             propertyMap.put(containerTypeName + "#" + p.name, p);
         }
