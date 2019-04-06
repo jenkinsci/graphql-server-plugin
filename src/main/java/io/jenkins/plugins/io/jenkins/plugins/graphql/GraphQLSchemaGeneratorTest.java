@@ -1,14 +1,28 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import graphql.ExecutionResult;
+import graphql.GraphQL;
+import hudson.model.FreeStyleProject;
+import hudson.model.Run;
+import net.sf.json.JSON;
+import net.sf.json.JSONObject;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.WithoutJenkins;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.*;
 
 public class GraphQLSchemaGeneratorTest {
+    @Rule
+    public JenkinsRule j = new JenkinsRule();
 
     @Test
+    @WithoutJenkins
     public void generateSchemaString() {
         GraphQLSchemaGenerator graphQLSchemaGenerator = new GraphQLSchemaGenerator();
         String schema = graphQLSchemaGenerator.generateSchemaString();
@@ -103,5 +117,30 @@ public class GraphQLSchemaGeneratorTest {
             "type Action { \n" +
             "    _class: String!\n" +
             "}\n", schema);
+    }
+
+    @Test
+    public void generateSchema() throws Exception {
+        FreeStyleProject freestyle = j.createFreeStyleProject("freestyle");
+        Run r = freestyle.scheduleBuild2(0).waitForStart();
+        j.waitForCompletion(r);
+
+        GraphQLSchemaGenerator graphQLSchemaGenerator = new GraphQLSchemaGenerator();
+        GraphQL graphQL = graphQLSchemaGenerator.generateSchema();
+        ExecutionResult execute = graphQL.execute("query {\n" +
+            "  allJobs {\n" +
+            "    _class\n" +
+            "    color\n" +
+            "    allBuilds {\n" +
+            "      _class\n" +
+            "      displayName\n" +
+            "      id\n" +
+            "    }\n" +
+            "  }\n" +
+            "}");
+        assertEquals(
+            JSONObject.fromObject("{\"data\": {\"allJobs\": [{\"_class\":\"hudson.model.FreeStyleProject\", \"color\":\"blue\", \"allBuilds\":[{\"_class\":\"hudson.model.FreeStyleBuild\", \"displayName\":\"#1\", \"id\":\"1\"}]}]}}"),
+            JSONObject.fromObject(execute.toSpecification())
+        );
     }
 }

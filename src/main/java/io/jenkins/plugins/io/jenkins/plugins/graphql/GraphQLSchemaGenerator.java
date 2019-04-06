@@ -39,6 +39,8 @@ public class GraphQLSchemaGenerator {
         Double.class
     ));
 
+    static final HashMap<String, Property> propertyMap = new HashMap<>();
+
     private static final HashMap<String, String> javaTypesToGraphqlTypes = new HashMap<>();
     static {
         javaTypesToGraphqlTypes.put("boolean", "Boolean");
@@ -112,7 +114,7 @@ public class GraphQLSchemaGenerator {
     private StringBuilder buildSchemaFromClass(Class clazz) {
         StringBuilder typeBuilder = new StringBuilder();
         typeBuilder.append("type " + clazz.getSimpleName() + " { \n    _class: String!\n");
-        typeBuilder.append(createSchema(clazz));
+        typeBuilder.append(createSchema(clazz.getSimpleName(), clazz));
         typeBuilder.append("}\n");
         return typeBuilder;
     }
@@ -142,7 +144,7 @@ public class GraphQLSchemaGenerator {
             clazz.isAssignableFrom(Short.class);
     }
 
-    private String createSchema(Class clazz) {
+    private String createSchema(String containerTypeName, Class clazz) {
         StringBuilder sb = new StringBuilder();
         Model<? extends TopLevelItem> model;
         try {
@@ -152,7 +154,7 @@ public class GraphQLSchemaGenerator {
         }
 
         if (model.superModel != null) {
-            sb.append(createSchema(model.superModel.type));
+            sb.append(createSchema(containerTypeName, model.superModel.type));
         }
         for (Property p : model.getProperties()) {
             Class propertyClazz = p.getType();
@@ -171,6 +173,7 @@ public class GraphQLSchemaGenerator {
             sb.append(": ");
             sb.append(className);
             sb.append("\n");
+            propertyMap.put(containerTypeName + "#" + p.name, p);
         }
         return sb.toString();
     }
@@ -185,13 +188,15 @@ public class GraphQLSchemaGenerator {
         SchemaParser schemaParser = new SchemaParser();
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
         RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
-            .wiringFactory(new ClassWiringFactory())
             .wiringFactory(new WiringFactory() {
                 @Override
                 public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
                     FieldDefinition fieldDef = environment.getFieldDefinition();
-                    String s = fieldDef.getType().toString();
-                    return false;
+                    if ("_class".equals(fieldDef.getName())) {
+                        return true;
+                    }
+                    String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+                    return propertyMap.containsKey(name);
                 }
 
                 @Override
@@ -199,7 +204,12 @@ public class GraphQLSchemaGenerator {
                     return environment1 -> new DataFetcher<T>() {
                         @Override
                         public T get(DataFetchingEnvironment environment1) throws Exception {
-                            return (T) environment1.getSource().getClass().getName();
+                            FieldDefinition fieldDef = environment.getFieldDefinition();
+                            if ("_class".equals(fieldDef.getName())) {
+                                return (T) environment1.getSource().getClass().getName();
+                            }
+                            String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+                            return (T) propertyMap.get(name).getValue(environment1.getSource());
                         }
                     };
                 }
