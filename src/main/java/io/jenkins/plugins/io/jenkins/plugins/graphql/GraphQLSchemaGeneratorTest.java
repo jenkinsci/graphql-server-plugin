@@ -43,14 +43,6 @@ public class GraphQLSchemaGeneratorTest {
             "\n" +
             "type Job { \n" +
             "    _class: String!\n" +
-            "    actions: [Action]\n" +
-            "    description: String\n" +
-            "    displayName: String\n" +
-            "    displayNameOrNull: String\n" +
-            "    fullDisplayName: String\n" +
-            "    fullName: String\n" +
-            "    name: String\n" +
-            "    url: String\n" +
             "    allBuilds: [Run]\n" +
             "    buildable: Boolean\n" +
             "    builds: [Run]\n" +
@@ -69,6 +61,14 @@ public class GraphQLSchemaGeneratorTest {
             "    nextBuildNumber: Int\n" +
             "    property: [JobProperty]\n" +
             "    queueItem: Item\n" +
+            "    description: String\n" +
+            "    displayName: String\n" +
+            "    displayNameOrNull: String\n" +
+            "    fullDisplayName: String\n" +
+            "    fullName: String\n" +
+            "    name: String\n" +
+            "    url: String\n" +
+            "    actions: [Action]\n" +
             "}\n" +
             "\n" +
             "\n" +
@@ -79,7 +79,6 @@ public class GraphQLSchemaGeneratorTest {
             "\n" +
             "type Item { \n" +
             "    _class: String!\n" +
-            "    actions: [Action]\n" +
             "    blocked: Boolean\n" +
             "    buildable: Boolean\n" +
             "    id: ID\n" +
@@ -89,12 +88,12 @@ public class GraphQLSchemaGeneratorTest {
             "    task: String\n" +
             "    url: String\n" +
             "    why: String\n" +
+            "    actions: [Action]\n" +
             "}\n" +
             "\n" +
             "\n" +
             "type Run { \n" +
             "    _class: String!\n" +
-            "    actions: [Action]\n" +
             "    artifacts: [String]\n" +
             "    building: Boolean\n" +
             "    description: String\n" +
@@ -111,6 +110,7 @@ public class GraphQLSchemaGeneratorTest {
             "    result: String\n" +
             "    timestamp: String\n" +
             "    url: String\n" +
+            "    actions: [Action]\n" +
             "}\n" +
             "\n" +
             "\n" +

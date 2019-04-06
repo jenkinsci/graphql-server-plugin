@@ -40,8 +40,6 @@ public class GraphQLSchemaGenerator {
         Double.class
     ));
 
-    static final HashMap<String, Property> propertyMap = new HashMap<>();
-
     private static final HashMap<String, String> javaTypesToGraphqlTypes = new HashMap<>();
     static {
         javaTypesToGraphqlTypes.put("boolean", "Boolean");
@@ -53,9 +51,12 @@ public class GraphQLSchemaGenerator {
     }
 
     private final HashSet<Class> classes;
+    private final HashMap<String, Property> propertyMap;
+
 
     public GraphQLSchemaGenerator() {
         classes = new HashSet<Class>();
+        propertyMap = new HashMap<>();
     }
 
     public String generateSchemaString() {
@@ -152,11 +153,10 @@ public class GraphQLSchemaGenerator {
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
             return "";
         }
-
-        if (model.superModel != null) {
-            sb.append(createSchema(containerTypeName, model.superModel.type));
-        }
         for (Property p : model.getProperties()) {
+            if (propertyMap.containsKey(containerTypeName + "#" + p.name)) {
+                continue;
+            }
             Class propertyClazz = p.getType();
 
             String className = null;
@@ -179,6 +179,9 @@ public class GraphQLSchemaGenerator {
             }
             sb.append("\n");
             propertyMap.put(containerTypeName + "#" + p.name, p);
+        }
+        if (model.superModel != null) {
+            sb.append(createSchema(containerTypeName, model.superModel.type));
         }
         return sb.toString();
     }
@@ -206,16 +209,13 @@ public class GraphQLSchemaGenerator {
 
                 @Override
                 public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
-                    return environment1 -> new DataFetcher<T>() {
-                        @Override
-                        public T get(DataFetchingEnvironment environment1) throws Exception {
-                            FieldDefinition fieldDef = environment.getFieldDefinition();
-                            if ("_class".equals(fieldDef.getName())) {
-                                return (T) environment1.getSource().getClass().getName();
-                            }
-                            String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                            return (T) propertyMap.get(name).getValue(environment1.getSource());
+                    return environment1 -> (DataFetcher<T>) environment11 -> {
+                        FieldDefinition fieldDef = environment.getFieldDefinition();
+                        if ("_class".equals(fieldDef.getName())) {
+                            return (T) environment11.getSource().getClass().getName();
                         }
+                        String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+                        return (T) propertyMap.get(name).getValue(environment11.getSource());
                     };
                 }
             })
