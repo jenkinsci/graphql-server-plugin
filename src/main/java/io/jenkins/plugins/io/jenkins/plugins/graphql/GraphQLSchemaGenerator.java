@@ -18,11 +18,27 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
-import java.util.Collection;
-import java.util.HashMap;
+import java.net.URL;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class GraphQLSchemaGenerator {
     /*package*/ static ModelBuilder MODEL_BUILDER = new ModelBuilder();
+    /*package*/ static final Set<Class> STRING_TYPES = new HashSet<Class>(Arrays.asList(
+        String.class,
+        URL.class
+    ));
+
+    /*package*/ static final Set<Class> PRIMITIVE_TYPES = new HashSet<Class>(Arrays.asList(
+        Integer.class,
+        Long.class,
+        Boolean.class,
+        Short.class,
+        Character.class,
+        Float.class,
+        Double.class
+    ));
+
     private static final HashMap<String, String> javaTypesToGraphqlTypes = new HashMap<>();
     static {
         javaTypesToGraphqlTypes.put("boolean", "Boolean");
@@ -30,29 +46,137 @@ public class GraphQLSchemaGenerator {
         javaTypesToGraphqlTypes.put("float", "Float");
         javaTypesToGraphqlTypes.put("integer", "Int");
         javaTypesToGraphqlTypes.put("int", "Int");
+        javaTypesToGraphqlTypes.put("long", "Int");
+    }
+
+    private final HashSet<Class> classes;
+
+    public GraphQLSchemaGenerator() {
+        classes = new HashSet<Class>();
     }
 
     public String generateSchemaString() {
         StringBuilder queryBuilder = new StringBuilder();
-        StringBuilder typesBuilder = new StringBuilder();
 
-        queryBuilder.append("allJobs: [Job]\n");
-        typesBuilder.append(buildSchemaFromClass(Job.class).toString());
+        queryBuilder.append("    allJobs: [Job]\n");
+        classes.add(Job.class);
+        findAllClasses(Job.class);
 
         for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
             if (Job.class.isAssignableFrom(d.clazz)) {
-                queryBuilder.append("all" + d.clazz.getSimpleName() + ": [" + d.clazz.getSimpleName() + "]\n");
-                typesBuilder.append(buildSchemaFromClass(d.clazz).toString());
+                queryBuilder.append("    all" + d.clazz.getSimpleName() + ": [" + d.clazz.getSimpleName() + "]\n");
+                classes.add(d.clazz);
+                findAllClasses(d.clazz);
             }
         }
         return "schema {\n" +
             "    query: QueryType\n" +
             "}\n" +
             "type QueryType {\n" +
-            queryBuilder.toString() + "\n" +
+            queryBuilder.toString() +
             "}\n" +
-            typesBuilder.toString() + "\n";
+            classes.stream()
+                .sorted(Comparator.comparing(Object::toString))
+                .map( clazz -> buildSchemaFromClass(clazz).toString())
+                .collect( Collectors.joining( "\n\n" ) );
     }
+
+    private void findAllClasses(Class clazz) {
+        Model<? extends TopLevelItem> model = MODEL_BUILDER.get(clazz);
+
+        if (model.superModel != null) {
+            findAllClasses(model.superModel.type);
+        }
+        for (Property p : model.getProperties()) {
+            Class propertyClazz = p.getType();
+
+            if (clazz.isInstance(Object[].class)) {
+                classes.add(propertyClazz.getComponentType());
+            } else if (Collection.class.isAssignableFrom(propertyClazz)) {
+                classes.add(getCollectionClass(p));
+            } else if (!isScalarClassType(propertyClazz)){
+                try {
+                    MODEL_BUILDER.get(propertyClazz);
+                } catch (org.kohsuke.stapler.export.NotExportableException e) {
+                    continue;
+                }
+                classes.add(propertyClazz);
+            }
+        }
+    }
+
+    private Class getCollectionClass(Property p) {
+        return TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
+    }
+
+    private StringBuilder buildSchemaFromClass(Class clazz) {
+        StringBuilder typeBuilder = new StringBuilder();
+        typeBuilder.append("type " + clazz.getSimpleName() + " { \n    _class: String!\n");
+        typeBuilder.append(createSchema(clazz));
+        typeBuilder.append("}\n");
+        return typeBuilder;
+    }
+
+    private String createSchemaClassName(Class clazz) {
+        if (!classes.contains(clazz)) {
+            return "String";
+        }
+
+        if (isScalarClassType(clazz)) {
+            return javaTypesToGraphqlTypes.getOrDefault(clazz.getSimpleName(), clazz.getSimpleName());
+        }
+        return clazz.getSimpleName();
+    }
+
+    private boolean isScalarClassType(Class clazz) {
+        return clazz.isPrimitive() ||
+            clazz.isAssignableFrom(String.class) ||
+            clazz.isAssignableFrom(Integer.class) ||
+            clazz.isAssignableFrom(Long.class) ||
+            clazz.isAssignableFrom(Double.class) ||
+            clazz.isAssignableFrom(Float.class) ||
+            clazz.isAssignableFrom(Boolean.class) ||
+            clazz.isAssignableFrom(Character.class) ||
+            clazz.isAssignableFrom(Byte.class) ||
+            clazz.isAssignableFrom(Void.class) ||
+            clazz.isAssignableFrom(Short.class);
+    }
+
+    private String createSchema(Class clazz) {
+        StringBuilder sb = new StringBuilder();
+        Model<? extends TopLevelItem> model;
+        try {
+            model = MODEL_BUILDER.get(clazz);
+        } catch (org.kohsuke.stapler.export.NotExportableException e) {
+            return "";
+        }
+
+        if (model.superModel != null) {
+            sb.append(createSchema(model.superModel.type));
+        }
+        for (Property p : model.getProperties()) {
+            Class propertyClazz = p.getType();
+
+            String className = null;
+            if (clazz.isInstance(Object[].class)) {
+                className = "[" + createSchemaClassName(propertyClazz.getComponentType()) + "]";
+            } else if (Collection.class.isAssignableFrom(propertyClazz)) {
+                className = "[" + createSchemaClassName(getCollectionClass(p)) + "]";
+            } else {
+                className = createSchemaClassName(propertyClazz);
+            }
+
+            sb.append("    ");
+            sb.append(p.name);
+            sb.append(": ");
+            sb.append(className);
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+
+    /**********************/
 
     public GraphQL generateSchema() {
         String schema = this.generateSchemaString();
@@ -61,7 +185,25 @@ public class GraphQLSchemaGenerator {
         SchemaParser schemaParser = new SchemaParser();
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
         RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
-            .wiringFactory(new GraphQLSchemaGenerator.ClassWiringFactory())
+            .wiringFactory(new ClassWiringFactory())
+            .wiringFactory(new WiringFactory() {
+                @Override
+                public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
+                    FieldDefinition fieldDef = environment.getFieldDefinition();
+                    String s = fieldDef.getType().toString();
+                    return false;
+                }
+
+                @Override
+                public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
+                    return environment1 -> new DataFetcher<T>() {
+                        @Override
+                        public T get(DataFetchingEnvironment environment1) throws Exception {
+                            return (T) environment1.getSource().getClass().getName();
+                        }
+                    };
+                }
+            })
             .type("QueryType", typeWiring -> {
                 TypeRuntimeWiring.Builder builder = typeWiring
                     .dataFetcher("allJobs", dataFetchingEnvironment -> Items.allItems(
@@ -86,86 +228,4 @@ public class GraphQLSchemaGenerator {
         return GraphQL.newGraphQL(graphQLSchema).build();
     }
 
-    private static class ClassWiringFactory implements WiringFactory {
-        @Override
-        public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
-            FieldDefinition fieldDef = environment.getFieldDefinition();
-            if ("_class".equals(fieldDef.getName())) {
-                return true;
-            }
-            return false;
-        }
-
-        @Override
-        public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
-            return environment1 -> new DataFetcher<T>() {
-                @Override
-                public T get(DataFetchingEnvironment environment1) throws Exception {
-                    return (T) environment1.getSource().getClass().getName();
-                }
-            };
-        }
-    }
-
-    private StringBuilder buildSchemaFromClass(Class clazz) {
-        StringBuilder typeBuilder = new StringBuilder();
-        typeBuilder.append("type " + clazz.getSimpleName() + " { \n_class: String!\n");
-        Model<? extends TopLevelItem> model = MODEL_BUILDER.get(clazz);
-        typeBuilder.append(createSchema(model));
-        typeBuilder.append("\n");
-        typeBuilder.append("}\n");
-        return typeBuilder;
-    }
-
-    private String createSchemaClassName(Property p, Class clazz) {
-        if (clazz.isPrimitive() ||
-            clazz.isAssignableFrom(String.class) ||
-            clazz.isAssignableFrom(Integer.class) ||
-            clazz.isAssignableFrom(Long.class) ||
-            clazz.isAssignableFrom(Double.class) ||
-            clazz.isAssignableFrom(Float.class) ||
-            clazz.isAssignableFrom(Boolean.class) ||
-            clazz.isAssignableFrom(Character.class) ||
-            clazz.isAssignableFrom(Byte.class) ||
-            clazz.isAssignableFrom(Void.class) ||
-            clazz.isAssignableFrom(Short.class)
-        ) {
-            return javaTypesToGraphqlTypes.getOrDefault(clazz.getSimpleName(), clazz.getSimpleName());
-        }
-        return null;
-    }
-
-    private String createSchema(Model<?> model) {
-        StringBuilder sb = new StringBuilder();
-        if (model.superModel != null) {
-            sb.append(createSchema(model.superModel));
-        }
-        for (Property p : model.getProperties()) {
-            Class clazz = p.getType();
-
-
-            String className = null;
-            if (clazz.isInstance(Object[].class)) {
-                className = createSchemaClassName(p, clazz.getComponentType());
-                if (className != null) {
-                    className = "[" + className + "]";
-                }
-            }
-            else if (Collection.class.isAssignableFrom(clazz)) {
-                className = createSchemaClassName(p, TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class),0)));
-                if (className != null) {
-                    className = "[" + className + "]";
-                }
-            } else {
-                className = createSchemaClassName(p, clazz);
-            }
-
-            if (className == null) { continue; }
-            sb.append(p.name);
-            sb.append(":");
-            sb.append(className);
-            sb.append("\n");
-        }
-        return sb.toString();
-    }
 }
