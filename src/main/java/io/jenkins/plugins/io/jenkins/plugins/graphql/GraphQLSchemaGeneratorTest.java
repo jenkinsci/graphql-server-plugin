@@ -82,7 +82,7 @@ public class GraphQLSchemaGeneratorTest {
             "    actions: [Action]\n" +
             "    blocked: Boolean\n" +
             "    buildable: Boolean\n" +
-            "    id: Int\n" +
+            "    id: ID\n" +
             "    inQueueSince: Int\n" +
             "    params: String\n" +
             "    stuck: Boolean\n" +
@@ -104,7 +104,7 @@ public class GraphQLSchemaGeneratorTest {
             "    executor: String\n" +
             "    fingerprint: [String]\n" +
             "    fullDisplayName: String\n" +
-            "    id: String\n" +
+            "    id: ID\n" +
             "    keepLog: Boolean\n" +
             "    number: Int\n" +
             "    queueId: Int\n" +
