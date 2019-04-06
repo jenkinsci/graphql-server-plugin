@@ -52,6 +52,7 @@ public class GraphQLSchemaGenerator {
 
     private final HashSet<Class> classes;
     private final HashMap<String, Property> propertyMap;
+    private String schemaString;
 
 
     public GraphQLSchemaGenerator() {
@@ -186,15 +187,19 @@ public class GraphQLSchemaGenerator {
         return sb.toString();
     }
 
+    public String getSchema() {
+        if (this.schemaString == null) {
+            this.schemaString = this.generateSchemaString();
+        }
+        return this.schemaString;
+
+    }
 
     /**********************/
 
     public GraphQL generateSchema() {
-        String schema = this.generateSchemaString();
-
-        // if (!schema.isEmpty()) { throw new Error(schema); }
         SchemaParser schemaParser = new SchemaParser();
-        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(schema);
+        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(this.getSchema());
         RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
             .wiringFactory(new WiringFactory() {
                 @Override
