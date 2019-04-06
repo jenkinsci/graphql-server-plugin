@@ -161,7 +161,7 @@ public class GraphQLSchemaGenerator {
             String className = null;
             if ("id".equals(p.name)) {
                 className = "ID";
-            } else if (clazz.isInstance(Object[].class)) {
+            } else if (propertyClazz.isInstance(Object[].class)) {
                 className = "[" + createSchemaClassName(propertyClazz.getComponentType()) + "]";
             } else if (Collection.class.isAssignableFrom(propertyClazz)) {
                 className = "[" + createSchemaClassName(getCollectionClass(p)) + "]";
