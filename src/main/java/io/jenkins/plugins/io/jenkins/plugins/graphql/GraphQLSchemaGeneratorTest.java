@@ -37,7 +37,7 @@ public class GraphQLSchemaGeneratorTest {
             "    description: String\n" +
             "    iconClassName: String\n" +
             "    iconUrl: String\n" +
-            "    score: String\n" +
+            "    score: Int\n" +
             "}\n" +
             "\n" +
             "\n" +
@@ -52,13 +52,13 @@ public class GraphQLSchemaGeneratorTest {
             "    name: String\n" +
             "    url: String\n" +
             "    allBuilds: [Run]\n" +
-            "    buildable: String\n" +
+            "    buildable: Boolean\n" +
             "    builds: [Run]\n" +
             "    color: String\n" +
             "    firstBuild: Run\n" +
             "    healthReport: [HealthReport]\n" +
-            "    inQueue: String\n" +
-            "    keepDependencies: String\n" +
+            "    inQueue: Boolean\n" +
+            "    keepDependencies: Boolean\n" +
             "    lastBuild: Run\n" +
             "    lastCompletedBuild: Run\n" +
             "    lastFailedBuild: Run\n" +
@@ -66,7 +66,7 @@ public class GraphQLSchemaGeneratorTest {
             "    lastSuccessfulBuild: Run\n" +
             "    lastUnstableBuild: Run\n" +
             "    lastUnsuccessfulBuild: Run\n" +
-            "    nextBuildNumber: String\n" +
+            "    nextBuildNumber: Int\n" +
             "    property: [JobProperty]\n" +
             "    queueItem: Item\n" +
             "}\n" +
@@ -80,12 +80,12 @@ public class GraphQLSchemaGeneratorTest {
             "type Item { \n" +
             "    _class: String!\n" +
             "    actions: [Action]\n" +
-            "    blocked: String\n" +
-            "    buildable: String\n" +
-            "    id: String\n" +
-            "    inQueueSince: String\n" +
+            "    blocked: Boolean\n" +
+            "    buildable: Boolean\n" +
+            "    id: Int\n" +
+            "    inQueueSince: Int\n" +
             "    params: String\n" +
-            "    stuck: String\n" +
+            "    stuck: Boolean\n" +
             "    task: String\n" +
             "    url: String\n" +
             "    why: String\n" +
@@ -96,18 +96,18 @@ public class GraphQLSchemaGeneratorTest {
             "    _class: String!\n" +
             "    actions: [Action]\n" +
             "    artifacts: [String]\n" +
-            "    building: String\n" +
+            "    building: Boolean\n" +
             "    description: String\n" +
             "    displayName: String\n" +
-            "    duration: String\n" +
-            "    estimatedDuration: String\n" +
+            "    duration: Int\n" +
+            "    estimatedDuration: Int\n" +
             "    executor: String\n" +
             "    fingerprint: [String]\n" +
             "    fullDisplayName: String\n" +
             "    id: String\n" +
-            "    keepLog: String\n" +
-            "    number: String\n" +
-            "    queueId: String\n" +
+            "    keepLog: Boolean\n" +
+            "    number: Int\n" +
+            "    queueId: Int\n" +
             "    result: String\n" +
             "    timestamp: String\n" +
             "    url: String\n" +
@@ -131,6 +131,8 @@ public class GraphQLSchemaGeneratorTest {
             "  allJobs {\n" +
             "    _class\n" +
             "    color\n" +
+            "    buildable\n" +
+            "    nextBuildNumber\n" +
             "    allBuilds {\n" +
             "      _class\n" +
             "      displayName\n" +
@@ -139,7 +141,7 @@ public class GraphQLSchemaGeneratorTest {
             "  }\n" +
             "}");
         assertEquals(
-            JSONObject.fromObject("{\"data\": {\"allJobs\": [{\"_class\":\"hudson.model.FreeStyleProject\", \"color\":\"blue\", \"allBuilds\":[{\"_class\":\"hudson.model.FreeStyleBuild\", \"displayName\":\"#1\", \"id\":\"1\"}]}]}}"),
+            JSONObject.fromObject("{\"data\": {\"allJobs\": [{\"_class\":\"hudson.model.FreeStyleProject\", \"color\":\"blue\", \"buildable\":true, \"nextBuildNumber\":2, \"allBuilds\":[{\"_class\":\"hudson.model.FreeStyleBuild\", \"displayName\":\"#1\", \"id\":\"1\"}]}]}}"),
             JSONObject.fromObject(execute.toSpecification())
         );
     }

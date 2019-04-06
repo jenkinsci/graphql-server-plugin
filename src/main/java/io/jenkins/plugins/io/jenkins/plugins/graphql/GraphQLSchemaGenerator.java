@@ -120,12 +120,11 @@ public class GraphQLSchemaGenerator {
     }
 
     private String createSchemaClassName(Class clazz) {
-        if (!classes.contains(clazz)) {
-            return "String";
-        }
-
         if (isScalarClassType(clazz)) {
             return javaTypesToGraphqlTypes.getOrDefault(clazz.getSimpleName(), clazz.getSimpleName());
+        }
+        if (!classes.contains(clazz)) {
+            return "String";
         }
         return clazz.getSimpleName();
     }
