@@ -55,15 +55,12 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
 
     @SuppressWarnings("unused")
     // @RequirePOST
-    public void doIndex() throws IOException {
-        StaplerRequest req = Stapler.getCurrentRequest();
-        StaplerResponse res = Stapler.getCurrentResponse();
-
+    public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
         // Get the POST stream
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
-        if (body.isEmpty()) {
-            throw new Error("No body");
-        }
+//        if (body.isEmpty()) {
+//            throw new Error("No body");
+//        }
 
         LOGGER.info("Body: " + body);
         JSONObject jsonRequest = JSONObject.fromObject(body);;
@@ -71,8 +68,9 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(jsonRequest.getString("query")).build();
         ExecutionResult executionResult = builtSchema.execute(executionInput);
 
-        ServletOutputStream outputStream = res.getOutputStream();
+        ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
+        rsp.setContentType("application/json");
         osw.write(JSONObject.fromObject(executionResult.toSpecification()).toString(2));
         osw.flush();
         osw.close();
