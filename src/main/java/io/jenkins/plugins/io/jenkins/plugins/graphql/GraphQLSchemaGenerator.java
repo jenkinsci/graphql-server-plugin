@@ -4,7 +4,6 @@ import graphql.GraphQL;
 import graphql.language.FieldDefinition;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetcherFactory;
-import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.idl.*;
 import hudson.DescriptorExtensionList;
@@ -116,7 +115,14 @@ public class GraphQLSchemaGenerator {
 
     private StringBuilder buildSchemaFromClass(Class clazz) {
         StringBuilder typeBuilder = new StringBuilder();
-        typeBuilder.append("type " + clazz.getSimpleName() + " { \n    _class: String!\n");
+        typeBuilder.append("type ");
+        typeBuilder.append(clazz.getSimpleName());
+//        if (classes.contains(clazz.getSuperclass())) {
+//            typeBuilder.append(" implements ");
+//            typeBuilder.append(clazz.getSuperclass().getSimpleName());
+//        }
+        typeBuilder.append(" { \n");
+        typeBuilder.append("    _class: String!\n");
         typeBuilder.append(createSchema(clazz.getSimpleName(), clazz));
         typeBuilder.append("}\n");
         return typeBuilder;

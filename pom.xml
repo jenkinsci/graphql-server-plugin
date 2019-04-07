@@ -36,14 +36,6 @@
             <artifactId>graphql-java</artifactId>
             <version>2019-04-03T06-16-20-800ea0d</version>
         </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jenkins-ci.main</groupId>
-            <artifactId>jenkins-test-harness</artifactId>
-        </dependency>
     </dependencies>
 
     <repositories>
