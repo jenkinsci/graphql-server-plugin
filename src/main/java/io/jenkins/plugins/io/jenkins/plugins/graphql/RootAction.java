@@ -91,6 +91,14 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         req.getView(this, "schema.jelly").forward(req, rsp);
     }
 
+    @SuppressWarnings("unused")
+    public void doClient(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
+        Jenkins.getInstanceOrNull().checkPermission(Jenkins.ADMINISTER);
+        rsp.setStatus(HttpServletResponse.SC_OK);
+        rsp.setContentType("text/html");
+        req.getView(this, "client.jelly").forward(req, rsp);
+    }
+
     @Override
     public String getSearchUrl() {
         return null;

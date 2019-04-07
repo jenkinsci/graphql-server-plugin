@@ -62,21 +62,21 @@ public class GraphQLSchemaGenerator {
     public String generateSchemaString() {
         StringBuilder queryBuilder = new StringBuilder();
 
-        queryBuilder.append("    allJobs: [Job]\n");
+        queryBuilder.append("    allJobs: [Job]!\n");
         classes.add(Job.class);
         findAllClasses(Job.class);
 
         for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
             if (Job.class.isAssignableFrom(d.clazz)) {
-                queryBuilder.append("    all" + d.clazz.getSimpleName() + ": [" + d.clazz.getSimpleName() + "]\n");
+                queryBuilder.append("    all" + d.clazz.getSimpleName() + ": [" + d.clazz.getSimpleName() + "]!\n");
                 classes.add(d.clazz);
                 findAllClasses(d.clazz);
             }
         }
         return "schema {\n" +
-            "    query: QueryType\n" +
+            "    query: Query\n" +
             "}\n" +
-            "type QueryType {\n" +
+            "type Query {\n" +
             queryBuilder.toString() +
             "}\n" +
             classes.stream()
@@ -230,7 +230,7 @@ public class GraphQLSchemaGenerator {
                     };
                 }
             })
-            .type("QueryType", typeWiring -> {
+            .type("Query", typeWiring -> {
                 TypeRuntimeWiring.Builder builder = typeWiring
                     .dataFetcher("allJobs", dataFetchingEnvironment -> Items.allItems(
                         Jenkins.getAuthentication(),
