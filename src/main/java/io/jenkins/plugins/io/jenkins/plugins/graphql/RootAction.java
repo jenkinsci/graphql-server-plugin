@@ -20,6 +20,8 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 @Extension
@@ -56,21 +58,48 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
     @SuppressWarnings("unused")
     // @RequirePOST
     public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
-        // Get the POST stream
+        HashMap<String, Object> variables = new HashMap<>();
+        HashMap<String, Object> context = new HashMap<>();
+        String query = "";
+        String operationName = "";
+
+        Map<String, String[]> parameterMap = req.getParameterMap();
+
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
-//        if (body.isEmpty()) {
-//            throw new Error("No body");
-//        }
-
         LOGGER.info("Body: " + body);
-        JSONObject jsonRequest = JSONObject.fromObject(body);;
+        if ("application/graphql".equals(req.getContentType())) {
+            query = body;
+        } else if (parameterMap.size() > 0) {
+            query = parameterMap.get("query")[0];
+            operationName = parameterMap.get("operationName")[0];
+            // FIXME - variables
+        } else if (!body.isEmpty()) {
+            JSONObject jsonRequest = JSONObject.fromObject(body);
+            query = jsonRequest.optString("query");
+            operationName = jsonRequest.optString("operationName");
+            JSONObject jsonVariables = jsonRequest.optJSONObject("variables");
+            if (jsonVariables != null) {
+                variables = (HashMap<String, Object>) jsonVariables.toBean(HashMap.class);
+            }
+        }
 
-        ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(jsonRequest.getString("query")).build();
+        if (query.isEmpty()) {
+            rsp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
+        ExecutionInput executionInput = ExecutionInput
+            .newExecutionInput()
+            .query(query)
+            .operationName(operationName)
+            .context(context)
+            .variables(variables)
+            .build();
+
         ExecutionResult executionResult = builtSchema.execute(executionInput);
 
         ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
-        rsp.setContentType("application/json");
         osw.write(JSONObject.fromObject(executionResult.toSpecification()).toString(2));
         osw.flush();
         osw.close();
