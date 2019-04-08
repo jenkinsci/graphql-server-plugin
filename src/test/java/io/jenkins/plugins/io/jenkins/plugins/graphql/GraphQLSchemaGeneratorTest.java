@@ -27,10 +27,10 @@ public class GraphQLSchemaGeneratorTest {
         GraphQLSchemaGenerator graphQLSchemaGenerator = new GraphQLSchemaGenerator();
         String schema = graphQLSchemaGenerator.generateSchemaString();
         assertEquals("schema {\n" +
-            "    query: QueryType\n" +
+            "    query: Query\n" +
             "}\n" +
-            "type QueryType {\n" +
-            "    allJobs: [Job]\n" +
+            "type Query {\n" +
+            "    allJobs: [Job]!\n" +
             "}\n" +
             "type HealthReport { \n" +
             "    _class: String!\n" +
@@ -41,7 +41,7 @@ public class GraphQLSchemaGeneratorTest {
             "}\n" +
             "\n" +
             "\n" +
-            "type Job { \n" +
+            "interface Job { \n" +
             "    _class: String!\n" +
             "    allBuilds: [Run]\n" +
             "    buildable: Boolean\n" +

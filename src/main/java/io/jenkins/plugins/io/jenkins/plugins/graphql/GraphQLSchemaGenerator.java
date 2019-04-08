@@ -1,10 +1,9 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
 import graphql.GraphQL;
+import graphql.TypeResolutionEnvironment;
 import graphql.language.FieldDefinition;
-import graphql.schema.DataFetcher;
-import graphql.schema.DataFetcherFactory;
-import graphql.schema.GraphQLSchema;
+import graphql.schema.*;
 import graphql.schema.idl.*;
 import hudson.DescriptorExtensionList;
 import hudson.model.Items;
@@ -23,7 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class GraphQLSchemaGenerator {
-    /*package*/ static ModelBuilder MODEL_BUILDER = new ModelBuilder();
+    /*package*/ static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
     /*package*/ static final Set<Class> STRING_TYPES = new HashSet<Class>(Arrays.asList(
         String.class,
         URL.class
@@ -39,7 +38,12 @@ public class GraphQLSchemaGenerator {
         Double.class
     ));
 
+    /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<Class>(Arrays.asList(
+        Job.class
+    ));
+
     private static final HashMap<String, String> javaTypesToGraphqlTypes = new HashMap<>();
+
     static {
         javaTypesToGraphqlTypes.put("boolean", "Boolean");
         javaTypesToGraphqlTypes.put("string", "String");
@@ -73,16 +77,12 @@ public class GraphQLSchemaGenerator {
                 findAllClasses(d.clazz);
             }
         }
-        return "schema {\n" +
-            "    query: Query\n" +
-            "}\n" +
-            "type Query {\n" +
-            queryBuilder.toString() +
-            "}\n" +
+        return "schema {\n    query: Query\n}\n" +
+            "type Query {\n" + queryBuilder.toString() + "}\n" +
             classes.stream()
                 .sorted(Comparator.comparing(Object::toString))
-                .map( clazz -> buildSchemaFromClass(clazz).toString())
-                .collect( Collectors.joining( "\n\n" ) );
+                .map(clazz -> buildSchemaFromClass(clazz).toString())
+                .collect(Collectors.joining("\n\n"));
     }
 
     private void findAllClasses(Class clazz) {
@@ -98,7 +98,7 @@ public class GraphQLSchemaGenerator {
                 classes.add(propertyClazz.getComponentType());
             } else if (Collection.class.isAssignableFrom(propertyClazz)) {
                 classes.add(getCollectionClass(p));
-            } else if (!isScalarClassType(propertyClazz)){
+            } else if (!isScalarClassType(propertyClazz)) {
                 try {
                     MODEL_BUILDER.get(propertyClazz);
                 } catch (org.kohsuke.stapler.export.NotExportableException e) {
@@ -115,12 +115,24 @@ public class GraphQLSchemaGenerator {
 
     private StringBuilder buildSchemaFromClass(Class clazz) {
         StringBuilder typeBuilder = new StringBuilder();
-        typeBuilder.append("type ");
+        if (TOP_LEVEL_CLASSES.contains(clazz)) {
+            typeBuilder.append("interface ");
+        } else {
+            typeBuilder.append("type ");
+        }
         typeBuilder.append(clazz.getSimpleName());
-//        if (classes.contains(clazz.getSuperclass())) {
-//            typeBuilder.append(" implements ");
-//            typeBuilder.append(clazz.getSuperclass().getSimpleName());
-//        }
+        if (!TOP_LEVEL_CLASSES.contains(clazz)) {
+
+            String _implements = TOP_LEVEL_CLASSES.stream()
+                .filter(topClazz -> topClazz.isAssignableFrom(clazz))
+                .sorted(Comparator.comparing(Object::toString))
+                .map(topClazz -> topClazz.getSimpleName())
+                .collect(Collectors.joining(" & "));
+            if (!_implements.isEmpty()) {
+                typeBuilder.append(" implements ");
+                typeBuilder.append(_implements);
+            }
+        }
         typeBuilder.append(" { \n");
         typeBuilder.append("    _class: String!\n");
         typeBuilder.append(createSchema(clazz.getSimpleName(), clazz));
@@ -208,6 +220,27 @@ public class GraphQLSchemaGenerator {
         TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(this.getSchema());
         RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
             .wiringFactory(new WiringFactory() {
+                @Override
+                public boolean providesTypeResolver(InterfaceWiringEnvironment environment) {
+                    return true;
+                }
+
+                @Override
+                public TypeResolver getTypeResolver(InterfaceWiringEnvironment environment) {
+                    return new TypeResolver() {
+                        @Override
+                        public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+                            Object javaObject = env.getObject();
+//                            for (Class clazz : TOP_LEVEL_CLASSES) {
+//                                if (clazz.isAssignableFrom(javaObject.getClass())) {
+//                                    return env.getSchema().getObjectType(clazz.getSimpleName());
+//                                }
+//                            }
+                            return  env.getSchema().getObjectType(javaObject.getClass().getSimpleName());
+                        }
+                    };
+                }
+
                 @Override
                 public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
                     FieldDefinition fieldDef = environment.getFieldDefinition();
