@@ -8,6 +8,9 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
 import jenkins.model.Jenkins;
+import net.sf.json.JSON;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
 import org.apache.commons.io.IOUtils;
 import org.kohsuke.stapler.Stapler;
@@ -22,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Extension
@@ -55,6 +59,15 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         builtSchema = graphQLSchemaGenerator.generateSchema();
     }
 
+    public static String optString(JSONObject json, String key, String defaultValue)
+    {
+        // http://code.google.com/p/android/issues/detail?id=13830
+        if (json.opt(key) instanceof JSONNull)
+            return defaultValue;
+        else
+            return json.optString(key, defaultValue);
+    }
+
     @SuppressWarnings("unused")
     // @RequirePOST
     public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
@@ -75,8 +88,8 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
             // FIXME - variables
         } else if (!body.isEmpty()) {
             JSONObject jsonRequest = JSONObject.fromObject(body);
-            query = jsonRequest.optString("query");
-            operationName = jsonRequest.optString("operationName");
+            query = optString(jsonRequest, "query", "");
+            operationName = optString(jsonRequest, "operationName", "");
             JSONObject jsonVariables = jsonRequest.optJSONObject("variables");
             if (jsonVariables != null) {
                 variables = (HashMap<String, Object>) jsonVariables.toBean(HashMap.class);
@@ -88,19 +101,37 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
             return;
         }
 
-        ExecutionInput executionInput = ExecutionInput
-            .newExecutionInput()
-            .query(query)
-            .operationName(operationName)
-            .context(context)
-            .variables(variables)
-            .build();
-
-        ExecutionResult executionResult = builtSchema.execute(executionInput);
-
         ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
-        osw.write(JSONObject.fromObject(executionResult.toSpecification()).toString(2));
+        rsp.setContentType("application/json");
+        rsp.setHeader("Access-Control-Allow-Origin", "*");
+
+        try {
+            ExecutionInput executionInput = ExecutionInput
+                .newExecutionInput()
+                .query(query)
+                .operationName(operationName)
+                .context(context)
+                .variables(variables)
+                .build();
+
+            ExecutionResult executionResult = builtSchema.execute(executionInput);
+            osw.write(JSONObject.fromObject(executionResult.toSpecification()).toString());
+        } catch (graphql.execution.UnknownOperationException e) {
+            JSONObject errResp = new JSONObject();
+            errResp.put("data", new JSONObject());
+            JSONObject errJsonObject = new JSONObject();
+            errJsonObject.put("message", e.getMessage());
+            errJsonObject.put("locations", null);
+            errJsonObject.put("errorType", e.getClass().getSimpleName());
+
+            JSONArray errorsList = new JSONArray();
+            errorsList.add(errJsonObject);
+
+            errResp.put("errors", errorsList);
+            osw.write(errResp.toString(2));
+            LOGGER.log(Level.SEVERE, "Error processing query", e);
+        }
         osw.flush();
         osw.close();
     }
