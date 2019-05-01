@@ -8,12 +8,10 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
 import jenkins.model.Jenkins;
-import net.sf.json.JSON;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
 import org.apache.commons.io.IOUtils;
-import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 

@@ -1,6 +1,7 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
 import graphql.GraphQL;
+import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
 import graphql.language.FieldDefinition;
 import graphql.schema.*;
@@ -19,9 +20,14 @@ import org.kohsuke.stapler.export.TypeUtil;
 import javax.annotation.Nonnull;
 import java.net.URL;
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class GraphQLSchemaGenerator {
+    private final static Logger LOGGER = Logger.getLogger(GraphQLSchemaGenerator.class.getName());
+
     /*package*/ static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
     /*package*/ static final Set<Class> STRING_TYPES = new HashSet<Class>(Arrays.asList(
         String.class,
@@ -114,6 +120,17 @@ public class GraphQLSchemaGenerator {
     }
 
     private StringBuilder buildSchemaFromClass(Class clazz) {
+        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject()
+            .name(clazz.getSimpleName())
+            .description("moo")
+            .field(
+                GraphQLFieldDefinition.newFieldDefinition()
+                    .name("_class")
+                    .description("Class Name")
+                    .type(Scalars.GraphQLString)
+                    .build()
+            );
+
         StringBuilder typeBuilder = new StringBuilder();
         if (TOP_LEVEL_CLASSES.contains(clazz)) {
             typeBuilder.append("interface ");
@@ -135,8 +152,12 @@ public class GraphQLSchemaGenerator {
         }
         typeBuilder.append(" { \n");
         typeBuilder.append("    _class: String!\n");
-        typeBuilder.append(createSchema(clazz.getSimpleName(), clazz));
+        typeBuilder.append(createSchema(clazz.getSimpleName(), clazz, fieldBuilder));
         typeBuilder.append("}\n");
+
+        GraphQLObjectType fooType =  fieldBuilder.build();
+        LOGGER.log(Level.WARNING, fooType.toString());
+        LOGGER.log(Level.WARNING, fooType.transform(Consumer))
         return typeBuilder;
     }
 
@@ -164,7 +185,7 @@ public class GraphQLSchemaGenerator {
             clazz.isAssignableFrom(Short.class);
     }
 
-    private String createSchema(String containerTypeName, Class clazz) {
+    private String createSchema(String containerTypeName, Class clazz, GraphQLObjectType.Builder fieldBuilder) {
         StringBuilder sb = new StringBuilder();
         Model<? extends TopLevelItem> model;
         try {
@@ -193,6 +214,12 @@ public class GraphQLSchemaGenerator {
             sb.append(p.name);
             sb.append(": ");
             sb.append(className);
+            fieldBuilder.field(
+                GraphQLFieldDefinition.newFieldDefinition()
+                    .name(p.name)
+                    .type(Scalars.GraphQLString)
+                    .build()
+            );
             if (propertyClazz.isAnnotationPresent(Nonnull.class)) {
                 sb.append("!");
             }
@@ -200,7 +227,7 @@ public class GraphQLSchemaGenerator {
             propertyMap.put(containerTypeName + "#" + p.name, p);
         }
         if (model.superModel != null) {
-            sb.append(createSchema(containerTypeName, model.superModel.type));
+            sb.append(createSchema(containerTypeName, model.superModel.type, fieldBuilder ));
         }
         return sb.toString();
     }
