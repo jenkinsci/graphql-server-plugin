@@ -4,13 +4,11 @@ import graphql.GraphQL;
 import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
 import graphql.language.FieldDefinition;
+import graphql.language.SDLDefinition;
 import graphql.schema.*;
 import graphql.schema.idl.*;
 import hudson.DescriptorExtensionList;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.TopLevelItem;
-import hudson.model.TopLevelItemDescriptor;
+import hudson.model.*;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
@@ -120,17 +118,6 @@ public class GraphQLSchemaGenerator {
     }
 
     private StringBuilder buildSchemaFromClass(Class clazz) {
-        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject()
-            .name(clazz.getSimpleName())
-            .description("moo")
-            .field(
-                GraphQLFieldDefinition.newFieldDefinition()
-                    .name("_class")
-                    .description("Class Name")
-                    .type(Scalars.GraphQLString)
-                    .build()
-            );
-
         StringBuilder typeBuilder = new StringBuilder();
         if (TOP_LEVEL_CLASSES.contains(clazz)) {
             typeBuilder.append("interface ");
@@ -152,12 +139,8 @@ public class GraphQLSchemaGenerator {
         }
         typeBuilder.append(" { \n");
         typeBuilder.append("    _class: String!\n");
-        typeBuilder.append(createSchema(clazz.getSimpleName(), clazz, fieldBuilder));
+        typeBuilder.append(createSchema(clazz.getSimpleName(), clazz));
         typeBuilder.append("}\n");
-
-        GraphQLObjectType fooType =  fieldBuilder.build();
-        LOGGER.log(Level.WARNING, fooType.toString());
-        LOGGER.log(Level.WARNING, fooType.transform(Consumer))
         return typeBuilder;
     }
 
@@ -185,7 +168,7 @@ public class GraphQLSchemaGenerator {
             clazz.isAssignableFrom(Short.class);
     }
 
-    private String createSchema(String containerTypeName, Class clazz, GraphQLObjectType.Builder fieldBuilder) {
+    private String createSchema(String containerTypeName, Class clazz) {
         StringBuilder sb = new StringBuilder();
         Model<? extends TopLevelItem> model;
         try {
@@ -214,12 +197,6 @@ public class GraphQLSchemaGenerator {
             sb.append(p.name);
             sb.append(": ");
             sb.append(className);
-            fieldBuilder.field(
-                GraphQLFieldDefinition.newFieldDefinition()
-                    .name(p.name)
-                    .type(Scalars.GraphQLString)
-                    .build()
-            );
             if (propertyClazz.isAnnotationPresent(Nonnull.class)) {
                 sb.append("!");
             }
@@ -227,7 +204,7 @@ public class GraphQLSchemaGenerator {
             propertyMap.put(containerTypeName + "#" + p.name, p);
         }
         if (model.superModel != null) {
-            sb.append(createSchema(containerTypeName, model.superModel.type, fieldBuilder ));
+            sb.append(createSchema(containerTypeName, model.superModel.type ));
         }
         return sb.toString();
     }
@@ -310,6 +287,10 @@ public class GraphQLSchemaGenerator {
             }).build();
 
         SchemaGenerator schemaGenerator = new SchemaGenerator();
+
+        Builders b = new Builders();
+        typeDefinitionRegistry.add(b.buildSchemaFromClass(FreeStyleProject.class).getDefinition());
+        
         GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
         return GraphQL.newGraphQL(graphQLSchema).build();
     }
