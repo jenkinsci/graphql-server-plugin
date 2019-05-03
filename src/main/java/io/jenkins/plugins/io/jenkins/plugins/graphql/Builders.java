@@ -86,6 +86,11 @@ public class Builders {
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
+        try {
+            Model<?> model = MODEL_BUILDER.get(clazz);
+        } catch (org.kohsuke.stapler.export.NotExportableException e) {
+            return Scalars.GraphQLString;
+        }
         classQueue.add(clazz);
         // return clazz.isPrimitive() ||
         GraphQLTypeReference graphQLTypeReference = GraphQLTypeReference.typeRef(clazz.getSimpleName());
