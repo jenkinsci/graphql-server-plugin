@@ -220,79 +220,82 @@ public class GraphQLSchemaGenerator {
     /**********************/
 
     public GraphQL generateSchema() {
-        SchemaParser schemaParser = new SchemaParser();
-        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(this.getSchema());
-        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
-            .wiringFactory(new WiringFactory() {
-                @Override
-                public boolean providesTypeResolver(InterfaceWiringEnvironment environment) {
-                    return true;
-                }
-
-                @Override
-                public TypeResolver getTypeResolver(InterfaceWiringEnvironment environment) {
-                    return new TypeResolver() {
-                        @Override
-                        public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                            Object javaObject = env.getObject();
-//                            for (Class clazz : TOP_LEVEL_CLASSES) {
-//                                if (clazz.isAssignableFrom(javaObject.getClass())) {
-//                                    return env.getSchema().getObjectType(clazz.getSimpleName());
-//                                }
-//                            }
-                            return  env.getSchema().getObjectType(javaObject.getClass().getSimpleName());
-                        }
-                    };
-                }
-
-                @Override
-                public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
-                    FieldDefinition fieldDef = environment.getFieldDefinition();
-                    if ("_class".equals(fieldDef.getName())) {
-                        return true;
-                    }
-                    String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                    return propertyMap.containsKey(name);
-                }
-
-                @Override
-                public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
-                    return environment1 -> (DataFetcher<T>) environment11 -> {
-                        FieldDefinition fieldDef = environment.getFieldDefinition();
-                        if ("_class".equals(fieldDef.getName())) {
-                            return (T) environment11.getSource().getClass().getName();
-                        }
-                        String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                        return (T) propertyMap.get(name).getValue(environment11.getSource());
-                    };
-                }
-            })
-            .type("Query", typeWiring -> {
-                TypeRuntimeWiring.Builder builder = typeWiring
-                    .dataFetcher("allJobs", dataFetchingEnvironment -> Items.allItems(
-                        Jenkins.getAuthentication(),
-                        Jenkins.getInstanceOrNull(),
-                        Job.class
-                    ));
-                for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
-                    if (Job.class.isAssignableFrom(d.clazz)) {
-                        builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), dataFetchingEnvironment -> Items.allItems(
-                            Jenkins.getAuthentication(),
-                            Jenkins.getInstanceOrNull(),
-                            d.clazz
-                        ));
-                    }
-                }
-                return builder;
-            }).build();
-
-        SchemaGenerator schemaGenerator = new SchemaGenerator();
+//        SchemaParser schemaParser = new SchemaParser();
+//        TypeDefinitionRegistry typeDefinitionRegistry = schemaParser.parse(
+//            "schema {\n    query: Query\n}\n\n" +
+//            "           type Query { allJobs: [Job] }\n"
+//        ); // this.getSchema());
+//        RuntimeWiring runtimeWiring = RuntimeWiring.newRuntimeWiring()
+//            .wiringFactory(new WiringFactory() {
+//                @Override
+//                public boolean providesTypeResolver(InterfaceWiringEnvironment environment) {
+//                    return true;
+//                }
+//
+//                @Override
+//                public TypeResolver getTypeResolver(InterfaceWiringEnvironment environment) {
+//                    return new TypeResolver() {
+//                        @Override
+//                        public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+//                            Object javaObject = env.getObject();
+////                            for (Class clazz : TOP_LEVEL_CLASSES) {
+////                                if (clazz.isAssignableFrom(javaObject.getClass())) {
+////                                    return env.getSchema().getObjectType(clazz.getSimpleName());
+////                                }
+////                            }
+//                            return  env.getSchema().getObjectType(javaObject.getClass().getSimpleName());
+//                        }
+//                    };
+//                }
+//
+//                @Override
+//                public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
+//                    FieldDefinition fieldDef = environment.getFieldDefinition();
+//                    if ("_class".equals(fieldDef.getName())) {
+//                        return true;
+//                    }
+//                    String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+//                    return propertyMap.containsKey(name);
+//                }
+//
+//                @Override
+//                public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
+//                    return environment1 -> (DataFetcher<T>) environment11 -> {
+//                        FieldDefinition fieldDef = environment.getFieldDefinition();
+//                        if ("_class".equals(fieldDef.getName())) {
+//                            return (T) environment11.getSource().getClass().getName();
+//                        }
+//                        String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+//                        return (T) propertyMap.get(name).getValue(environment11.getSource());
+//                    };
+//                }
+//            })
+//            .type("Query", typeWiring -> {
+//                TypeRuntimeWiring.Builder builder = typeWiring
+//                    .dataFetcher("allJobs", dataFetchingEnvironment -> Items.allItems(
+//                        Jenkins.getAuthentication(),
+//                        Jenkins.getInstanceOrNull(),
+//                        Job.class
+//                    ));
+//                for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
+//                    if (Job.class.isAssignableFrom(d.clazz)) {
+//                        builder = builder.dataFetcher("all" + d.clazz.getSimpleName(), dataFetchingEnvironment -> Items.allItems(
+//                            Jenkins.getAuthentication(),
+//                            Jenkins.getInstanceOrNull(),
+//                            d.clazz
+//                        ));
+//                    }
+//                }
+//                return builder;
+//            }).build();
+//
+//        SchemaGenerator schemaGenerator = new SchemaGenerator();
 
         Builders b = new Builders();
-        typeDefinitionRegistry.add(b.buildSchemaFromClass(FreeStyleProject.class).getDefinition());
-        
-        GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
-        return GraphQL.newGraphQL(graphQLSchema).build();
+        // typeDefinitionRegistry.add(b.buildSchemaFromClass(FreeStyleProject.class).getDefinition());
+
+        // GraphQLSchema graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring);
+        return GraphQL.newGraphQL(b.buildSchema()).build();
     }
 
 }
