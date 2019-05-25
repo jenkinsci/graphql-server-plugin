@@ -7,6 +7,7 @@ import hudson.Extension;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
+import hudson.model.User;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
@@ -21,6 +22,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -73,11 +75,17 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         HashMap<String, Object> context = new HashMap<>();
         String query = "";
         String operationName = "";
-
         Map<String, String[]> parameterMap = req.getParameterMap();
 
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
         LOGGER.info("Body: " + body);
+
+        String id = req.getHeader("Authorization");
+        if (id != null || !id.isEmpty()) {
+            User user = User.get(id.replace("Bearer ", ""), false, Collections.emptyMap());
+            context.put("user", user);
+        }
+
         if ("application/graphql".equals(req.getContentType())) {
             query = body;
         } else if (parameterMap.size() > 0) {
