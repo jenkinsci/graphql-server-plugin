@@ -1,44 +1,31 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Lists;
+import graphql.GraphQL;
 import graphql.Scalars;
-import graphql.language.ObjectTypeDefinition;
 import graphql.language.StringValue;
-import graphql.language.TypeDefinition;
+import graphql.relay.Connection;
+import graphql.relay.SimpleListConnection;
 import graphql.schema.*;
+import hudson.DescriptorExtensionList;
+import hudson.model.Items;
 import hudson.model.Job;
+import hudson.model.TopLevelItemDescriptor;
+import jenkins.model.Jenkins;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
 import java.util.*;
-import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static com.google.common.collect.Iterators.skip;
 
 public class Builders {
     private final static Logger LOGGER = Logger.getLogger(GraphQLSchemaGenerator.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
-
-    public static final GraphQLScalarType GraphQLClass = GraphQLScalarType.newScalar()
-        .name("Class")
-        .description("class")
-        .coercing(new Coercing<String, String>() {
-            public String serialize(Object input) {
-                return input.toString();
-            }
-
-            public String parseValue(Object input) {
-                return this.serialize(input);
-            }
-
-            public String parseLiteral(Object input) {
-                if (!(input instanceof StringValue)) {
-                    throw new CoercingParseLiteralException("Expected AST type 'StringValue' but was '" + input.getClass().toString() + "'.");
-                } else {
-                    return ((StringValue)input).getValue();
-                }
-            }
-         }).build();
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
@@ -116,6 +103,12 @@ public class Builders {
                     .name("_class")
                     .description("Class Name")
                     .type(Scalars.GraphQLString)
+                    .dataFetcher(new DataFetcher<Object>() {
+                        @Override
+                        public Object get(DataFetchingEnvironment environment) throws Exception {
+                            return environment.getSource().getClass().getSimpleName();
+                        }
+                    })
                     .build()
             );
 
@@ -159,6 +152,7 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
+                        .dataFetcher(environment -> p.getValue(environment.getSource()))
                         .build()
                 );
             }
@@ -170,28 +164,83 @@ public class Builders {
     }
 
     public GraphQLSchema buildSchema() {
-        GraphQLObjectType queryType = GraphQLObjectType.newObject()
-            .name("QueryType")
-
-            .field(GraphQLFieldDefinition.newFieldDefinition()
-                .name("allJobs")
-                .type(GraphQLTypeReference.typeRef("Job"))
-                .argument(GraphQLArgument.newArgument()
-                    .name("start")
-                    .type(GraphQLNonNull.nonNull(Scalars.GraphQLInt)))
-                .argument(GraphQLArgument.newArgument()
-                    .name("size")
-                    .type(GraphQLNonNull.nonNull(Scalars.GraphQLInt)))
-                // .dataFetcher(inputDF))
-            ).build();
-
+        GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
         classQueue.add(Job.class);
+
+        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+                .type(Scalars.GraphQLString)
+                .name("hello")
+                .staticValue("world"));
+
+        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+            .type(GraphQLNonNull.nonNull(GraphQLList.list(GraphQLNonNull.nonNull(Scalars.GraphQLString))))
+            .name("helloList")
+            .staticValue(Arrays.asList("world", "hi", "there")));
+
+
+        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+            .name("allJobs")
+            .type(GraphQLList.list(GraphQLTypeReference.typeRef("Job")))
+            .argument(GraphQLArgument.newArgument()
+                .name("offset")
+                .type(Scalars.GraphQLInt)
+                .defaultValue(0)
+            )
+            .argument(GraphQLArgument.newArgument()
+                .name("limit")
+                .type(Scalars.GraphQLInt)
+                .defaultValue(100)
+            )
+            .dataFetcher(new DataFetcher<Object>() {
+
+
+                public <Job> Iterator<Job> slice(Iterator<Job> base, int start, int limit) {
+                    // fast-forward
+                    int skipped = skip(base,start);
+                    if (skipped < start){ //already at the end, nothing to return
+                        Iterators.emptyIterator();
+                    }
+                    return Iterators.limit(base, limit);
+                }
+
+                @Override
+                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
+                    int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
+                    int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
+                    Iterable<Job> jobs = Items.allItems(
+                        Jenkins.getAuthentication(),
+                        Jenkins.getInstanceOrNull(),
+                        Job.class
+                    );
+                    return Lists.newArrayList(jobs.iterator());
+                }
+            })
+        );
+
+
+        for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
+            if (Job.class.isAssignableFrom(d.clazz)) {
+                classQueue.add(d.clazz);
+                queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+                        .name("all" + d.clazz.getSimpleName())
+                        .type(GraphQLList.list(GraphQLTypeReference.typeRef(d.clazz.getSimpleName())))
+                        .argument(GraphQLArgument.newArgument()
+                            .name("start")
+                            .type(Scalars.GraphQLInt))
+                        .argument(GraphQLArgument.newArgument()
+                            .name("size")
+                            .type(Scalars.GraphQLInt))
+                    // .dataFetcher(inputDF))
+                );
+            }
+        }
+
         while (!classQueue.isEmpty()) {
             this.buildSchemaFromClass(classQueue.poll());
         }
         return GraphQLSchema.newSchema()
-            .query(queryType)
+            .query(queryType.build())
             .additionalTypes(new HashSet<GraphQLType>(graphQLTypes.values()))
             .build();
     }

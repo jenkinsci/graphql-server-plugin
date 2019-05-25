@@ -110,8 +110,7 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
         rsp.setContentType("application/json");
-        rsp.setHeader("Access-Control-Allow-Origin", "*");
-
+        // rsp.setHeader("Access-Control-Allow-Origin", "*");
         try {
             ExecutionInput executionInput = ExecutionInput
                 .newExecutionInput()
@@ -140,11 +139,6 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         }
         osw.flush();
         osw.close();
-    }
-
-    @SuppressWarnings("unused")
-    public String getSchemaString() {
-        return graphQLSchemaGenerator.getSchema();
     }
 
     @SuppressWarnings("unused")
