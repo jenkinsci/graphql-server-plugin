@@ -3,6 +3,7 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.GraphQL;
+import graphql.GraphQLContext;
 import graphql.Scalars;
 import graphql.language.StringValue;
 import graphql.relay.Connection;
@@ -12,7 +13,11 @@ import hudson.DescriptorExtensionList;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.TopLevelItemDescriptor;
+import hudson.model.User;
+import hudson.security.ACL;
+import hudson.security.ACLContext;
 import jenkins.model.Jenkins;
+import org.acegisecurity.Authentication;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
@@ -152,7 +157,17 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
-                        .dataFetcher(environment -> p.getValue(environment.getSource()))
+                        .dataFetcher(environment -> {
+                            GraphQLContext context = (GraphQLContext) environment.getContext();
+                            User user = (User) context.get("user");
+                            if (user == null) {
+                                user =  User.current();
+                            }
+                            Authentication auth = Jenkins.getAuthentication();
+                            try (ACLContext ignored = ACL.as(user.impersonate())) {
+                                return p.getValue(environment.getSource());
+                            }
+                        })
                         .build()
                 );
             }
