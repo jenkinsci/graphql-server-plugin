@@ -88,7 +88,11 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
             context.put("user", User.get(id.replace("Bearer ", ""), false, Collections.emptyMap()));
         }
         if (!context.containsKey("user") || context.get("user") == null) {
-            context.put("user", Jenkins.ANONYMOUS);
+            context.put("user", User.current());
+        }
+
+        if (!context.containsKey("user") || context.get("user") == null) {
+            context.put("user", User.get("anonymous", false, Collections.emptyMap()));
         }
 
         if ("application/graphql".equals(req.getContentType())) {
