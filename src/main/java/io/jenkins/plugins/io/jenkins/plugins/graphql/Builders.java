@@ -157,11 +157,11 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
-                        .dataFetcher(environment -> {
-                            GraphQLContext context = environment.getContext();
-                            User user = context.get("user");
+                        .dataFetcher(dataFetchingEnvironment -> {
+                            HashMap context = dataFetchingEnvironment.getContext();
+                            User user = (User) context.get("user");
                             try (ACLContext ignored = ACL.as(user.impersonate())) {
-                                return p.getValue(environment.getSource());
+                                return p.getValue(dataFetchingEnvironment.getSource());
                             }
                         })
                         .build()
@@ -217,15 +217,19 @@ public class Builders {
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                    GraphQLContext context = dataFetchingEnvironment.getContext();
-                    User user = context.get("user");
+                    HashMap context = dataFetchingEnvironment.getContext();
+                    User user = (User) context.get("user");
                     try (ACLContext ignored = ACL.as(user.impersonate())) {
                         Iterable<Job> jobs = Items.allItems(
                             Jenkins.getAuthentication(),
                             Jenkins.getInstanceOrNull(),
                             Job.class
                         );
-                        return Lists.newArrayList(jobs.iterator());
+                        return Lists.newArrayList(slice(
+                            jobs.iterator(),
+                            offset,
+                            limit
+                        ));
                     }
                 }
             })
