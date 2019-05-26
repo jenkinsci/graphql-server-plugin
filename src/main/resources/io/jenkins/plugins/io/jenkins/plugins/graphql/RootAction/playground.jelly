@@ -3,6 +3,13 @@
          xmlns:t="/lib/hudson" xmlns:f="/lib/form">
     <j:new var="h" className="hudson.Functions" />
     ${h.initPageVariables(context)}
+    <!-- response contentType header -->
+    <st:contentType value="text/html;charset=UTF-8" />
+    <!--
+      needed to generate a session if non exists,
+      without it we would add ";jsessionid=" to the url which will result in a 404
+    -->
+    <j:set var="_" value="${request.getSession()}"/>
     <html>
         <head data-rooturl="${rootURL}" data-resurl="${resURL}" resURL="${resURL}">
             <meta charset="utf-8" />
