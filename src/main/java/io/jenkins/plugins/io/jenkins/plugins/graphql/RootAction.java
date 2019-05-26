@@ -8,6 +8,8 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
 import hudson.model.User;
+import hudson.security.ACL;
+import hudson.security.ACLContext;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
@@ -81,11 +83,12 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         LOGGER.info("Body: " + body);
 
         String id = req.getHeader("Authorization");
-        if (id != null || !id.isEmpty()) {
+        if (id != null && !id.isEmpty()) {
             // FIXME - security is currently Bearer <username>
             context.put("user", User.get(id.replace("Bearer ", ""), false, Collections.emptyMap()));
-        } else {
-            context.put("user", User.current());
+        }
+        if (!context.containsKey("user") || context.get("user") == null) {
+            context.put("user", Jenkins.ANONYMOUS);
         }
 
         if ("application/graphql".equals(req.getContentType())) {
@@ -105,15 +108,16 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
         }
 
         if (query.isEmpty()) {
-            rsp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            rsp.setStatus(HttpServletResponse.SC_OK);
             return;
         }
 
         ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
         rsp.setContentType("application/json");
-        // rsp.setHeader("Access-Control-Allow-Origin", "*");
         try {
+//            User user = (User) context.get("user");
+//            try (ACLContext ignored = ACL.as(user.impersonate())) {
             ExecutionInput executionInput = ExecutionInput
                 .newExecutionInput()
                 .query(query)

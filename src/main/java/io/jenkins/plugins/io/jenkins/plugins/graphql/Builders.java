@@ -108,12 +108,7 @@ public class Builders {
                     .name("_class")
                     .description("Class Name")
                     .type(Scalars.GraphQLString)
-                    .dataFetcher(new DataFetcher<Object>() {
-                        @Override
-                        public Object get(DataFetchingEnvironment environment) throws Exception {
-                            return environment.getSource().getClass().getSimpleName();
-                        }
-                    })
+                    .dataFetcher(dataFetcher -> dataFetcher.getSource().getClass().getSimpleName())
                     .build()
             );
 
@@ -157,13 +152,7 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
-                        .dataFetcher(dataFetchingEnvironment -> {
-                            HashMap context = dataFetchingEnvironment.getContext();
-                            User user = (User) context.get("user");
-                            try (ACLContext ignored = ACL.as(user.impersonate())) {
-                                return p.getValue(dataFetchingEnvironment.getSource());
-                            }
-                        })
+                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()))
                         .build()
                 );
             }
@@ -217,20 +206,17 @@ public class Builders {
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                    HashMap context = dataFetchingEnvironment.getContext();
-                    User user = (User) context.get("user");
-                    try (ACLContext ignored = ACL.as(user.impersonate())) {
-                        Iterable<Job> jobs = Items.allItems(
-                            Jenkins.getAuthentication(),
-                            Jenkins.getInstanceOrNull(),
-                            Job.class
-                        );
-                        return Lists.newArrayList(slice(
-                            jobs.iterator(),
-                            offset,
-                            limit
-                        ));
-                    }
+
+                    Iterable<Job> jobs = Items.allItems(
+                        Jenkins.getAuthentication(),
+                        Jenkins.getInstanceOrNull(),
+                        Job.class
+                    );
+                    return Lists.newArrayList(slice(
+                        jobs.iterator(),
+                        offset,
+                        limit
+                    ));
                 }
             })
         );
