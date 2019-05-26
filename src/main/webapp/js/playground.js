@@ -6,6 +6,7 @@ window.addEventListener("load", function(event) {
     GraphQLPlayground.init(root, {
         endpoint: window.rootURL + "/graphql/",
         settings: {
+            "request.credentials": "include",
             "schema.polling.enable": false
         }
     });
