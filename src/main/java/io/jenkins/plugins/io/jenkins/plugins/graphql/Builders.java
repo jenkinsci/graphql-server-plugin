@@ -158,12 +158,8 @@ public class Builders {
                         .name(p.name)
                         .type(className)
                         .dataFetcher(environment -> {
-                            GraphQLContext context = (GraphQLContext) environment.getContext();
-                            User user = (User) context.get("user");
-                            if (user == null) {
-                                user =  User.current();
-                            }
-                            Authentication auth = Jenkins.getAuthentication();
+                            GraphQLContext context = environment.getContext();
+                            User user = context.get("user");
                             try (ACLContext ignored = ACL.as(user.impersonate())) {
                                 return p.getValue(environment.getSource());
                             }
@@ -208,8 +204,6 @@ public class Builders {
                 .defaultValue(100)
             )
             .dataFetcher(new DataFetcher<Object>() {
-
-
                 public <Job> Iterator<Job> slice(Iterator<Job> base, int start, int limit) {
                     // fast-forward
                     int skipped = skip(base,start);
@@ -223,12 +217,16 @@ public class Builders {
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                    Iterable<Job> jobs = Items.allItems(
-                        Jenkins.getAuthentication(),
-                        Jenkins.getInstanceOrNull(),
-                        Job.class
-                    );
-                    return Lists.newArrayList(jobs.iterator());
+                    GraphQLContext context = dataFetchingEnvironment.getContext();
+                    User user = context.get("user");
+                    try (ACLContext ignored = ACL.as(user.impersonate())) {
+                        Iterable<Job> jobs = Items.allItems(
+                            Jenkins.getAuthentication(),
+                            Jenkins.getInstanceOrNull(),
+                            Job.class
+                        );
+                        return Lists.newArrayList(jobs.iterator());
+                    }
                 }
             })
         );

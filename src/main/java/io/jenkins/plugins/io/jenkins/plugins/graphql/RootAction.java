@@ -82,8 +82,10 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
 
         String id = req.getHeader("Authorization");
         if (id != null || !id.isEmpty()) {
-            User user = User.get(id.replace("Bearer ", ""), false, Collections.emptyMap());
-            context.put("user", user);
+            // FIXME - security is currently Bearer <username>
+            context.put("user", User.get(id.replace("Bearer ", ""), false, Collections.emptyMap()));
+        } else {
+            context.put("user", User.current());
         }
 
         if ("application/graphql".equals(req.getContentType())) {
