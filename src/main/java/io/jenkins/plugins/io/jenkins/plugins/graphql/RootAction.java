@@ -35,7 +35,6 @@ import java.util.logging.Logger;
 public class RootAction extends Actionable implements hudson.model.RootAction {
     private final static Logger LOGGER = Logger.getLogger(RootAction.class.getName());
     private static GraphQL builtSchema;
-    private static GraphQLSchemaGenerator graphQLSchemaGenerator;
 
     @CheckForNull
     @Override
@@ -57,8 +56,8 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
 
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() {
-        graphQLSchemaGenerator = new GraphQLSchemaGenerator();
-        builtSchema = graphQLSchemaGenerator.generateSchema();
+        Builders b = new Builders();
+        builtSchema = GraphQL.newGraphQL(b.buildSchema()).build();
     }
 
     public static String optString(JSONObject json, String key, String defaultValue)

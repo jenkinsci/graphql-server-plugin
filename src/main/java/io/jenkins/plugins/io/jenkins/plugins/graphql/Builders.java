@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 import static com.google.common.collect.Iterators.skip;
 
 public class Builders {
-    private final static Logger LOGGER = Logger.getLogger(GraphQLSchemaGenerator.class.getName());
+    private final static Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();

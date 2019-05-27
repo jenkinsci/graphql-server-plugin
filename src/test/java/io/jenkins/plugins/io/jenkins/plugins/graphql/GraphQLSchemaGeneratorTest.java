@@ -119,30 +119,30 @@ public class GraphQLSchemaGeneratorTest {
 //            "}\n", schema);
 //    }
 
-    @Test
-    public void generateSchema() throws Exception {
-        FreeStyleProject freestyle = j.createFreeStyleProject("freestyle");
-        Run r = freestyle.scheduleBuild2(0).waitForStart();
-        j.waitForCompletion(r);
-
-        GraphQLSchemaGenerator graphQLSchemaGenerator = new GraphQLSchemaGenerator();
-        GraphQL graphQL = graphQLSchemaGenerator.generateSchema();
-        ExecutionResult execute = graphQL.execute("query {\n" +
-            "  allJobs {\n" +
-            "    _class\n" +
-            "    color\n" +
-            "    buildable\n" +
-            "    nextBuildNumber\n" +
-            "    allBuilds {\n" +
-            "      _class\n" +
-            "      displayName\n" +
-            "      id\n" +
-            "    }\n" +
-            "  }\n" +
-            "}");
-        assertEquals(
-            JSONObject.fromObject("{\"data\": {\"allJobs\": [{\"_class\":\"hudson.model.FreeStyleProject\", \"color\":\"blue\", \"buildable\":true, \"nextBuildNumber\":2, \"allBuilds\":[{\"_class\":\"hudson.model.FreeStyleBuild\", \"displayName\":\"#1\", \"id\":\"1\"}]}]}}"),
-            JSONObject.fromObject(execute.toSpecification())
-        );
-    }
+//    @Test
+//    public void generateSchema() throws Exception {
+//        FreeStyleProject freestyle = j.createFreeStyleProject("freestyle");
+//        Run r = freestyle.scheduleBuild2(0).waitForStart();
+//        j.waitForCompletion(r);
+//
+//        GraphQLSchemaGenerator graphQLSchemaGenerator = new GraphQLSchemaGenerator();
+//        GraphQL graphQL = graphQLSchemaGenerator.generateSchema();
+//        ExecutionResult execute = graphQL.execute("query {\n" +
+//            "  allJobs {\n" +
+//            "    _class\n" +
+//            "    color\n" +
+//            "    buildable\n" +
+//            "    nextBuildNumber\n" +
+//            "    allBuilds {\n" +
+//            "      _class\n" +
+//            "      displayName\n" +
+//            "      id\n" +
+//            "    }\n" +
+//            "  }\n" +
+//            "}");
+//        assertEquals(
+//            JSONObject.fromObject("{\"data\": {\"allJobs\": [{\"_class\":\"hudson.model.FreeStyleProject\", \"color\":\"blue\", \"buildable\":true, \"nextBuildNumber\":2, \"allBuilds\":[{\"_class\":\"hudson.model.FreeStyleBuild\", \"displayName\":\"#1\", \"id\":\"1\"}]}]}}"),
+//            JSONObject.fromObject(execute.toSpecification())
+//        );
+//    }
 }
