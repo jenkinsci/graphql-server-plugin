@@ -14,6 +14,7 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterators.skip;
 
@@ -60,7 +61,7 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<String, GraphQLObjectType> graphQLTypes = new HashMap();
+    private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, new Comparator<Class>() {
         @Override
         public int compare(Class o1, Class o2) {
@@ -90,9 +91,9 @@ public class Builders {
         return TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
     }
 
-    public GraphQLObjectType buildSchemaFromClass(Class clazz) {
+    public void buildSchemaFromClass(Class clazz) {
         if (graphQLTypes.containsKey(clazz.getSimpleName())) {
-            return graphQLTypes.get(clazz.getSimpleName());
+            return;
         }
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject()
             .name(clazz.getSimpleName())
@@ -110,9 +111,8 @@ public class Builders {
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            GraphQLObjectType type = fieldBuilder.build();
-            graphQLTypes.put(clazz.getSimpleName(), type);
-            return type;
+            graphQLTypes.put(clazz.getSimpleName(), fieldBuilder);
+            return;
         }
 
         ArrayList<Model<?>> queue = new ArrayList();
@@ -151,10 +151,7 @@ public class Builders {
                 );
             }
         }
-
-        GraphQLObjectType type = fieldBuilder.build();
-        graphQLTypes.put(clazz.getSimpleName(), type);
-        return type;
+        graphQLTypes.put(clazz.getSimpleName(), fieldBuilder);
     }
 
     public GraphQLSchema buildSchema() {
@@ -175,9 +172,18 @@ public class Builders {
         while (!classQueue.isEmpty()) {
             this.buildSchemaFromClass(classQueue.poll());
         }
+
+        HashSet<GraphQLType> types = new HashSet<>(
+            this.graphQLTypes
+                .values()
+                .stream()
+                .map(GraphQLObjectType.Builder::build)
+                .collect(Collectors.toList())
+        );
+
         return GraphQLSchema.newSchema()
             .query(queryType.build())
-            .additionalTypes(new HashSet<GraphQLType>(graphQLTypes.values()))
+            .additionalTypes(types)
             .build();
     }
 
