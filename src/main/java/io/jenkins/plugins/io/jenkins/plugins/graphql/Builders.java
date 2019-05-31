@@ -5,9 +5,7 @@ import com.google.common.collect.Lists;
 import graphql.Scalars;
 import graphql.schema.*;
 import hudson.DescriptorExtensionList;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.TopLevelItemDescriptor;
+import hudson.model.*;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
@@ -24,6 +22,11 @@ public class Builders {
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
+
+    /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<Class>(Arrays.asList(
+        Job.class,
+        User.class
+    ));
 
     static {
         javaTypesToGraphqlTypes.put("boolean", Scalars.GraphQLBoolean);
@@ -157,11 +160,31 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        classQueue.add(Job.class);
+        for (Class clazz : TOP_LEVEL_CLASSES) {
+            classQueue.add(clazz);
+            queryType = builAllQuery(queryType, clazz);
+        }
 
-        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
-            .name("allJobs")
-            .type(GraphQLList.list(GraphQLTypeReference.typeRef("Job")))
+        for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
+            if (Job.class.isAssignableFrom(d.clazz)) {
+                classQueue.add(d.clazz);
+                queryType = builAllQuery(queryType, d.clazz);
+            }
+        }
+
+        while (!classQueue.isEmpty()) {
+            this.buildSchemaFromClass(classQueue.poll());
+        }
+        return GraphQLSchema.newSchema()
+            .query(queryType.build())
+            .additionalTypes(new HashSet<GraphQLType>(graphQLTypes.values()))
+            .build();
+    }
+
+    private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
+        return queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+            .name("all" + clazz.getSimpleName())
+            .type(GraphQLList.list(GraphQLTypeReference.typeRef(clazz.getSimpleName())))
             .argument(GraphQLArgument.newArgument()
                 .name("offset")
                 .type(Scalars.GraphQLInt)
@@ -175,8 +198,8 @@ public class Builders {
             .dataFetcher(new DataFetcher<Object>() {
                 public <Job> Iterator<Job> slice(Iterator<Job> base, int start, int limit) {
                     // fast-forward
-                    int skipped = skip(base,start);
-                    if (skipped < start){ //already at the end, nothing to return
+                    int skipped = skip(base, start);
+                    if (skipped < start) { //already at the end, nothing to return
                         Iterators.emptyIterator();
                     }
                     return Iterators.limit(base, limit);
@@ -187,44 +210,23 @@ public class Builders {
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
 
-                    Iterable<Job> jobs = Items.allItems(
+
+                    if (clazz == User.class) {
+                        return Lists.newArrayList(slice(User.getAll().iterator(), offset, limit));
+                    }
+
+                    Iterable<?> items = Items.allItems(
                         Jenkins.getAuthentication(),
                         Jenkins.getInstanceOrNull(),
-                        Job.class
+                        clazz
                     );
                     return Lists.newArrayList(slice(
-                        jobs.iterator(),
+                        items.iterator(),
                         offset,
                         limit
                     ));
                 }
             })
         );
-
-
-        for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
-            if (Job.class.isAssignableFrom(d.clazz)) {
-                classQueue.add(d.clazz);
-                queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
-                        .name("all" + d.clazz.getSimpleName())
-                        .type(GraphQLList.list(GraphQLTypeReference.typeRef(d.clazz.getSimpleName())))
-                        .argument(GraphQLArgument.newArgument()
-                            .name("start")
-                            .type(Scalars.GraphQLInt))
-                        .argument(GraphQLArgument.newArgument()
-                            .name("size")
-                            .type(Scalars.GraphQLInt))
-                    // .dataFetcher(inputDF))
-                );
-            }
-        }
-
-        while (!classQueue.isEmpty()) {
-            this.buildSchemaFromClass(classQueue.poll());
-        }
-        return GraphQLSchema.newSchema()
-            .query(queryType.build())
-            .additionalTypes(new HashSet<GraphQLType>(graphQLTypes.values()))
-            .build();
     }
 }
