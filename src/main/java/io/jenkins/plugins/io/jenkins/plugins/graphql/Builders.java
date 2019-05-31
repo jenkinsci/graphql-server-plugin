@@ -233,7 +233,7 @@ public class Builders {
 
     private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
         return queryType.field(GraphQLFieldDefinition.newFieldDefinition()
-            .name("all" + clazz.getSimpleName())
+            .name("all" + clazz.getSimpleName() + "s")
             .type(GraphQLList.list(GraphQLTypeReference.typeRef(clazz.getSimpleName())))
             .argument(GraphQLArgument.newArgument()
                 .name("offset")
