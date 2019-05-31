@@ -151,14 +151,6 @@ public class RootAction extends Actionable implements hudson.model.RootAction {
     }
 
     @SuppressWarnings("unused")
-    public void doSchema(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
-        Jenkins.getInstanceOrNull().checkPermission(Jenkins.ADMINISTER);
-        rsp.setStatus(HttpServletResponse.SC_OK);
-        rsp.setContentType("text/html");
-        req.getView(this, "schema.jelly").forward(req, rsp);
-    }
-
-    @SuppressWarnings("unused")
     public void doClient(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         Jenkins.getInstanceOrNull().checkPermission(Jenkins.ADMINISTER);
         rsp.setStatus(HttpServletResponse.SC_OK);
