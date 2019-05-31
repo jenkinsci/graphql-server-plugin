@@ -1,8 +1,10 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import java.lang.reflect.Modifier;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
+import graphql.TypeResolutionEnvironment;
 import graphql.schema.*;
 import hudson.DescriptorExtensionList;
 import hudson.model.*;
@@ -61,7 +63,7 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, new Comparator<Class>() {
         @Override
         public int compare(Class o1, Class o2) {
@@ -92,11 +94,12 @@ public class Builders {
     }
 
     public void buildSchemaFromClass(Class clazz) {
-        if (graphQLTypes.containsKey(clazz.getSimpleName())) {
+        if (graphQLTypes.containsKey(clazz)) {
             return;
         }
-        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject()
-            .name(clazz.getSimpleName())
+        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
+
+        fieldBuilder.name(clazz.getSimpleName())
             .description("moo")
             .field(
                 GraphQLFieldDefinition.newFieldDefinition()
@@ -111,8 +114,14 @@ public class Builders {
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            graphQLTypes.put(clazz.getSimpleName(), fieldBuilder);
+            graphQLTypes.put(clazz, fieldBuilder);
             return;
+        }
+
+        for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
+            if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
+                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
+            }
         }
 
         ArrayList<Model<?>> queue = new ArrayList();
@@ -151,14 +160,15 @@ public class Builders {
                 );
             }
         }
-        graphQLTypes.put(clazz.getSimpleName(), fieldBuilder);
+        graphQLTypes.put(clazz, fieldBuilder);
     }
 
+    @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
         for (Class clazz : TOP_LEVEL_CLASSES) {
-            classQueue.add(clazz);
+            this.buildSchemaFromClass(clazz);
             queryType = builAllQuery(queryType, clazz);
         }
 
@@ -175,6 +185,8 @@ public class Builders {
             this.buildSchemaFromClass(classQueue.poll());
         }
 
+        GraphQLInterfaceType jobInterfaceType = convertToInterface(graphQLTypes.remove(Job.class).build());
+
         HashSet<GraphQLType> types = new HashSet<>(
             this.graphQLTypes
                 .values()
@@ -183,10 +195,40 @@ public class Builders {
                 .collect(Collectors.toList())
         );
 
+        GraphQLCodeRegistry codeRegistry = GraphQLCodeRegistry.newCodeRegistry()
+            .typeResolver(jobInterfaceType.getName(), new TypeResolver() {
+                @Override
+                public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+                    String name = env.getObject().getClass().getSimpleName();
+                    for (GraphQLType t : types) {
+                        if (t.getName().equals(name)) {
+                            return (GraphQLObjectType) t;
+                        }
+                    }
+                    return null;
+                }
+            })
+            .build();
+
         return GraphQLSchema.newSchema()
             .query(queryType.build())
+            .codeRegistry(codeRegistry)
             .additionalTypes(types)
+            .additionalType(jobInterfaceType)
             .build();
+    }
+
+    private GraphQLInterfaceType convertToInterface(GraphQLObjectType jobObjectType) {
+        GraphQLInterfaceType.Builder jobInterfaceType = GraphQLInterfaceType.newInterface();
+        jobInterfaceType.name(jobObjectType.getName());
+        jobInterfaceType.description(jobObjectType.getDescription());
+        for (GraphQLFieldDefinition fieldDefinition : jobObjectType.getFieldDefinitions()) {
+            jobInterfaceType.field(fieldDefinition);
+        }
+        for (GraphQLDirective directive: jobObjectType.getDirectives()) {
+            jobInterfaceType.withDirective(directive);
+        }
+        return jobInterfaceType.build();
     }
 
     private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
