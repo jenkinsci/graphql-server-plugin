@@ -160,17 +160,6 @@ public class Builders {
         classQueue.add(Job.class);
 
         queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
-                .type(Scalars.GraphQLString)
-                .name("hello")
-                .staticValue("world"));
-
-        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
-            .type(GraphQLNonNull.nonNull(GraphQLList.list(GraphQLNonNull.nonNull(Scalars.GraphQLString))))
-            .name("helloList")
-            .staticValue(Arrays.asList("world", "hi", "there")));
-
-
-        queryType = queryType.field(GraphQLFieldDefinition.newFieldDefinition()
             .name("allJobs")
             .type(GraphQLList.list(GraphQLTypeReference.typeRef("Job")))
             .argument(GraphQLArgument.newArgument()
