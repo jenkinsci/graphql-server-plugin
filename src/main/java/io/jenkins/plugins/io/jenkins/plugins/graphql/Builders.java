@@ -163,9 +163,11 @@ public class Builders {
         }
 
         for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
-            if (Job.class.isAssignableFrom(d.clazz)) {
-                classQueue.add(d.clazz);
-                queryType = builAllQuery(queryType, d.clazz);
+            if (!Modifier.isAbstract(d.clazz.getModifiers())) {
+                if (Job.class.isAssignableFrom(d.clazz)) {
+                    classQueue.add(d.clazz);
+                    queryType = builAllQuery(queryType, d.clazz);
+                }
             }
         }
 
