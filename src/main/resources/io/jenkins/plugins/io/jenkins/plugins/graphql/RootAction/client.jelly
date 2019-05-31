@@ -38,6 +38,7 @@
 
             <div id="graphiql">Loading...</div>
             <script src="${rootURL}/plugin/graphql-server/js/graphiql.js"></script>
-        </l:main-panel>
-    </l:layout>
+        </body>
+    </html>
 </j:jelly>
+
