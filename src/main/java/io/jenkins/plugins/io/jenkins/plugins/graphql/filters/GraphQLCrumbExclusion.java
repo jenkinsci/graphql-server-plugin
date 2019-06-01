@@ -10,7 +10,7 @@ import java.io.IOException;
 
 @Extension
 @SuppressWarnings("unused")
-public class CrumbExclusion extends hudson.security.csrf.CrumbExclusion {
+public class GraphQLCrumbExclusion extends hudson.security.csrf.CrumbExclusion {
 
     @Override
     public boolean process(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)

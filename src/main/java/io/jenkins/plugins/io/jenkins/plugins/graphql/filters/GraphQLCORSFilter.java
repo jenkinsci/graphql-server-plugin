@@ -18,7 +18,7 @@ import java.io.IOException;
  *  or only enable by descriptor / system property
  */
 @Extension
-public class CORSFilter implements Filter {
+public class GraphQLCORSFilter implements Filter {
     private static final String PREFLIGHT_REQUEST = "OPTIONS";
 
     @Initializer(after = InitMilestone.JOB_LOADED)
@@ -27,7 +27,7 @@ public class CORSFilter implements Filter {
         if (inj == null) {
             return;
         }
-        PluginServletFilter.addFilter(inj.getInstance(CORSFilter.class));
+        PluginServletFilter.addFilter(inj.getInstance(GraphQLCORSFilter.class));
     }
 
     @Override

@@ -8,9 +8,6 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
 import hudson.model.User;
-import hudson.security.ACL;
-import hudson.security.ACLContext;
-import jenkins.model.Jenkins;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
@@ -32,8 +29,8 @@ import java.util.logging.Logger;
 
 @Extension
 @SuppressWarnings("unused")
-public class RootAction extends Actionable implements hudson.model.RootAction {
-    private final static Logger LOGGER = Logger.getLogger(RootAction.class.getName());
+public class GraphQLRootAction extends Actionable implements hudson.model.RootAction {
+    private final static Logger LOGGER = Logger.getLogger(GraphQLRootAction.class.getName());
     private static GraphQL builtSchema;
 
     @CheckForNull
