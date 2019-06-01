@@ -11,6 +11,8 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /*
  * Borrored heavilty from cors-filter-plugin plugin
@@ -48,7 +50,10 @@ public class GraphQLCORSFilter implements Filter {
                 if (pathInfo != null && pathInfo.startsWith("/graphql")) {
 
                     resp.addHeader("Access-Control-Allow-Credentials", "true");
-                    resp.addHeader("Access-Control-Allow-Origin", req.getHeader("origin"));
+                    String originHeader = req.getHeader("origin");
+                    if(originHeader != null){
+                        resp.addHeader("Access-Control-Allow-Origin", URLEncoder.encode(originHeader, StandardCharsets.UTF_8.displayName()));
+                    }
                     resp.addHeader("Access-Control-Allow-Methods", "GET,POST");
                     resp.addHeader("Access-Control-Allow-Headers", "content-type,x-apollo-tracing");
 //                    resp.addHeader("Access-Control-Expose-Headers", getDescriptor().getExposedHeaders());
