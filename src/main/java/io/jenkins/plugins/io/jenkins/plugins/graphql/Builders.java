@@ -161,10 +161,7 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
-                        .dataFetcher(dataFetchingEnvironment -> {
-                            LOGGER.info(p.name + ":" + p.getValue(dataFetchingEnvironment.getSource()));
-                            return p.getValue(dataFetchingEnvironment.getSource());
-                        })
+                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()))
                         .build()
                 );
             }
