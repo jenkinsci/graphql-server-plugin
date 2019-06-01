@@ -25,23 +25,16 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh 'mvn verify test'
             }
-        }
-
-        // stage('Static Analysis') {
-        //     steps {
-        //         script {
-        //         }
-        //     }
-        // }
-        post {
-            always {
-                // def scannerHome = tool 'SonarQube Scanner 3.3';
-                withSonarQubeEnv {
-                    sh "mvn ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
+            post {
+                always {
+                    // def scannerHome = tool 'SonarQube Scanner 3.3';
+                    withSonarQubeEnv {
+                        sh "mvn ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
+                    }
+                    junit 'target/surefire-reports/*.xml'
                 }
-                junit 'target/surefire-reports/*.xml'
             }
         }
 
