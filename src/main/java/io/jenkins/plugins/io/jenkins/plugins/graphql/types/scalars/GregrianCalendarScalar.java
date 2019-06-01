@@ -2,6 +2,7 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql.types.scalars;
 
 import graphql.schema.*;
 
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.Date;
@@ -13,7 +14,7 @@ public class GregrianCalendarScalar extends GraphQLScalarType {
             @Override
             public String serialize(Object input) throws CoercingSerializeException {
                 if (input instanceof GregorianCalendar) {
-                    return ((GregorianCalendar) input).toZonedDateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                    return ((GregorianCalendar) input).toZonedDateTime().withZoneSameInstant(ZoneId.of("UTC")).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
                 }
                 throw new CoercingSerializeException(
                     "Expected something we can convert to 'java.time.GregorianCalendar' but was '" + input.getClass().toString() + "'."

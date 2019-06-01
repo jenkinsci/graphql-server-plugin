@@ -35,7 +35,7 @@ public class BuildersTest {
         ExecutionResult executeResult = _queryDataSet(run, graphqlRun, Arrays.asList("timestamp"));
 
         assertEquals(
-            JSONObject.fromObject("{\"test\": {\"timestamp\": \"2019-05-31T16:16:17.604-07:00\"}}"),
+            JSONObject.fromObject("{\"test\": {\"timestamp\": \"2019-05-31T23:16:17.604Z\"}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }
