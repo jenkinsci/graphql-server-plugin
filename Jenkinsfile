@@ -29,11 +29,14 @@ pipeline {
             }
             post {
                 always {
-                    // def scannerHome = tool 'SonarQube Scanner 3.3';
-                    withSonarQubeEnv {
-                        sh "mvn ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
-                    }
                     junit 'target/surefire-reports/*.xml'
+
+                    script {
+                        // def scannerHome = tool 'SonarQube Scanner 3.3';
+                        withSonarQubeEnv {
+                            sh "mvn ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
+                        }
+                    }
                 }
             }
         }
