@@ -79,12 +79,7 @@ public class Builders {
 
     /*** DONE STATIC */
     private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
-    private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, new Comparator<Class>() {
-        @Override
-        public int compare(Class o1, Class o2) {
-            return o1.getName().compareTo(o2.getName());
-        }
-    });
+    private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
 
     private GraphQLOutputType createSchemaClassName(Class clazz) {
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
