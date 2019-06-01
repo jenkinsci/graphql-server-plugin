@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.io.jenkins.plugins.graphql.types.scalars;
 
 import graphql.schema.*;
 
