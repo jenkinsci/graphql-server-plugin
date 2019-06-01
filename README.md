@@ -8,4 +8,63 @@ A graphql implementation for jenkins.
 ## TODO
 
 [] Create whoami function to output who you are
-[] Create allUsers function to list all users
+
+## "Feature Complete" query
+
+
+```
+query {
+  allJobs {
+    name
+    _class
+    allBuilds {
+      _class
+      actions
+      artifacts {
+        _class
+        displayPath
+        fileName
+        relativePath
+      }
+      building
+      description
+      displayName
+      duration
+      estimatedDuration
+      executor {
+        _class
+        currentExecutable
+        idle
+        likelyStuck
+        number
+        progress
+      }
+      fingerprint {
+        _class
+        fileName
+        hash
+        # original: BuildPtr
+        timestamp
+        # usage: [RangeItem]
+      }
+      fullDisplayName
+      keepLog
+      number
+      queueId
+      result
+      timestamp
+      url
+    }
+  }
+  allUsers {
+    _class
+    absoluteUrl
+    description
+    fullName
+    id
+    property {
+      _class
+    }
+  }
+}
+```
