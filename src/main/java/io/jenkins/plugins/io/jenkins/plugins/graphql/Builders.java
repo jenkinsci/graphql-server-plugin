@@ -1,6 +1,5 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
-import java.lang.reflect.Modifier;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
@@ -8,7 +7,10 @@ import graphql.TypeResolutionEnvironment;
 import graphql.scalars.ExtendedScalars;
 import graphql.schema.*;
 import hudson.DescriptorExtensionList;
-import hudson.model.*;
+import hudson.model.Items;
+import hudson.model.Job;
+import hudson.model.TopLevelItemDescriptor;
+import hudson.model.User;
 import io.jenkins.plugins.io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
@@ -17,15 +19,15 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Iterators.skip;
 
 public class Builders {
-    private final static Logger LOGGER = Logger.getLogger(Builders.class.getName());
+    // private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
