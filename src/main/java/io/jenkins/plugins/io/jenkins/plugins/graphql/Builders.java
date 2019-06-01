@@ -5,6 +5,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
+import graphql.scalars.ExtendedScalars;
+import graphql.scalars.datetime.DateScalar;
 import graphql.schema.*;
 import hudson.DescriptorExtensionList;
 import hudson.model.*;
@@ -59,6 +61,10 @@ public class Builders {
 
         javaTypesToGraphqlTypes.put("short", Scalars.GraphQLShort);
         javaTypesToGraphqlTypes.put(Short.class.getSimpleName(), Scalars.GraphQLShort);
+
+        javaTypesToGraphqlTypes.put("GregorianCalendar", AdditionalScalarTypes.gregrianCalendarScalar);
+        javaTypesToGraphqlTypes.put("Calendar", AdditionalScalarTypes.gregrianCalendarScalar);
+        javaTypesToGraphqlTypes.put("Date", AdditionalScalarTypes.gregrianCalendarScalar);
 
     }
 
@@ -155,7 +161,10 @@ public class Builders {
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
-                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()))
+                        .dataFetcher(dataFetchingEnvironment -> {
+                            LOGGER.info(p.name + ":" + p.getValue(dataFetchingEnvironment.getSource()));
+                            return p.getValue(dataFetchingEnvironment.getSource());
+                        })
                         .build()
                 );
             }
@@ -214,6 +223,8 @@ public class Builders {
             .query(queryType.build())
             .codeRegistry(codeRegistry)
             .additionalTypes(types)
+            .additionalType(ExtendedScalars.DateTime)
+            .additionalType(AdditionalScalarTypes.gregrianCalendarScalar)
             .additionalType(jobInterfaceType)
             .build();
     }
