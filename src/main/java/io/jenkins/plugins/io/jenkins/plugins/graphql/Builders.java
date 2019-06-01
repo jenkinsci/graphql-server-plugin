@@ -20,6 +20,7 @@ import org.kohsuke.stapler.export.TypeUtil;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.collect.Iterators.skip;
 
@@ -179,7 +180,7 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        for (Class clazz : INTERFACES) {
+        for (Class clazz : Stream.concat(INTERFACES.stream(), TOP_LEVEL_CLASSES.stream()).toArray(Class[]::new)) {
             this.buildSchemaFromClass(clazz);
         }
 
