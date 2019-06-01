@@ -190,9 +190,11 @@ public class Builders {
 
         for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
             if (!Modifier.isAbstract(d.clazz.getModifiers())) {
-                if (Job.class.isAssignableFrom(d.clazz)) {
-                    classQueue.add(d.clazz);
-                    queryType = builAllQuery(queryType, d.clazz);
+                for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
+                    if (d.clazz != topLevelClazz && topLevelClazz.isAssignableFrom(d.clazz)) {
+                        classQueue.add(d.clazz);
+                        queryType = builAllQuery(queryType, d.clazz);
+                    }
                 }
             }
         }
@@ -201,18 +203,13 @@ public class Builders {
             this.buildSchemaFromClass(classQueue.poll());
         }
 
-        GraphQLInterfaceType jobInterfaceType = convertToInterface(graphQLTypes.remove(Job.class).build());
+        HashSet<GraphQLType> types = new HashSet<>();
+        GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
-        HashSet<GraphQLType> types = new HashSet<>(
-            this.graphQLTypes
-                .values()
-                .stream()
-                .map(GraphQLObjectType.Builder::build)
-                .collect(Collectors.toList())
-        );
-
-        GraphQLCodeRegistry codeRegistry = GraphQLCodeRegistry.newCodeRegistry()
-            .typeResolver(jobInterfaceType.getName(), new TypeResolver() {
+        for (Class clazz : INTERFACES) {
+            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz).build());
+            types.add(interfaceType);
+            codeRegistry.typeResolver(interfaceType.getName(), new TypeResolver() {
                 @Override
                 public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                     String name = env.getObject().getClass().getSimpleName();
@@ -223,30 +220,39 @@ public class Builders {
                     }
                     return null;
                 }
-            })
-            .build();
+            });
+        }
+
+        types.addAll(
+            this.graphQLTypes
+                .values()
+                .stream()
+                .map(GraphQLObjectType.Builder::build)
+                .collect(Collectors.toList())
+        );
+
+
 
         return GraphQLSchema.newSchema()
             .query(queryType.build())
-            .codeRegistry(codeRegistry)
+            .codeRegistry(codeRegistry.build())
             .additionalTypes(types)
             .additionalType(ExtendedScalars.DateTime)
             .additionalType(AdditionalScalarTypes.gregrianCalendarScalar)
-            .additionalType(jobInterfaceType)
             .build();
     }
 
-    private GraphQLInterfaceType convertToInterface(GraphQLObjectType jobObjectType) {
-        GraphQLInterfaceType.Builder jobInterfaceType = GraphQLInterfaceType.newInterface();
-        jobInterfaceType.name(jobObjectType.getName());
-        jobInterfaceType.description(jobObjectType.getDescription());
-        for (GraphQLFieldDefinition fieldDefinition : jobObjectType.getFieldDefinitions()) {
-            jobInterfaceType.field(fieldDefinition);
+    private GraphQLInterfaceType convertToInterface(GraphQLObjectType objectType) {
+        GraphQLInterfaceType.Builder interfaceType = GraphQLInterfaceType.newInterface();
+        interfaceType.name(objectType.getName());
+        interfaceType.description(objectType.getDescription());
+        for (GraphQLFieldDefinition fieldDefinition : objectType.getFieldDefinitions()) {
+            interfaceType.field(fieldDefinition);
         }
-        for (GraphQLDirective directive: jobObjectType.getDirectives()) {
-            jobInterfaceType.withDirective(directive);
+        for (GraphQLDirective directive: objectType.getDirectives()) {
+            interfaceType.withDirective(directive);
         }
-        return jobInterfaceType.build();
+        return interfaceType.build();
     }
 
     private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
@@ -264,7 +270,7 @@ public class Builders {
                 .defaultValue(100)
             )
             .dataFetcher(new DataFetcher<Object>() {
-                public <Job> Iterator<Job> slice(Iterator<Job> base, int start, int limit) {
+                public Iterator<?> slice(Iterator<?> base, int start, int limit) {
                     // fast-forward
                     int skipped = skip(base, start);
                     if (skipped < start) { //already at the end, nothing to return
