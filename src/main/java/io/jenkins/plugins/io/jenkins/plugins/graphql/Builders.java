@@ -11,6 +11,7 @@ import hudson.DescriptorExtensionList;
 import hudson.model.*;
 import io.jenkins.plugins.io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
+import jenkins.scm.RunWithSCM;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
@@ -28,7 +29,12 @@ public class Builders {
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
-    /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<Class>(Arrays.asList(
+    /*package*/ static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
+        Job.class,
+        RunWithSCM.class
+    ));
+
+    /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
         Job.class,
         User.class
     ));
@@ -124,7 +130,7 @@ public class Builders {
             return;
         }
 
-        for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
+        for (Class topLevelClazz : INTERFACES) {
             if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
                 fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
             }
@@ -173,8 +179,11 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        for (Class clazz : TOP_LEVEL_CLASSES) {
+        for (Class clazz : INTERFACES) {
             this.buildSchemaFromClass(clazz);
+        }
+
+        for (Class clazz : TOP_LEVEL_CLASSES) {
             queryType = builAllQuery(queryType, clazz);
         }
 
