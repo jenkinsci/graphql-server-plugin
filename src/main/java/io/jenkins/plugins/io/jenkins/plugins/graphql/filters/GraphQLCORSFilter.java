@@ -25,7 +25,7 @@ public class GraphQLCORSFilter implements Filter {
 
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() throws ServletException {
-        Injector inj = Jenkins.getInstance().getInjector();
+        Injector inj = Jenkins.getInstanceOrNull().getInjector();
         if (inj == null) {
             return;
         }
@@ -56,8 +56,6 @@ public class GraphQLCORSFilter implements Filter {
                     }
                     resp.addHeader("Access-Control-Allow-Methods", "GET,POST");
                     resp.addHeader("Access-Control-Allow-Headers", "content-type,x-apollo-tracing");
-//                    resp.addHeader("Access-Control-Expose-Headers", getDescriptor().getExposedHeaders());
-//                    resp.addHeader("Access-Control-Max-Age", getDescriptor().getMaxAge());
                     /**
                      * If this is a preflight request, set the response to 200 OK.
                      */

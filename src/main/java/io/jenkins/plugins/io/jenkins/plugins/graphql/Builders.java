@@ -7,10 +7,7 @@ import graphql.TypeResolutionEnvironment;
 import graphql.scalars.ExtendedScalars;
 import graphql.schema.*;
 import hudson.DescriptorExtensionList;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.TopLevelItemDescriptor;
-import hudson.model.User;
+import hudson.model.*;
 import io.jenkins.plugins.io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
@@ -21,20 +18,29 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Iterators.skip;
 
 public class Builders {
-    // private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
+
+    static final private GraphQLFieldDefinition classFieldDefinition = GraphQLFieldDefinition.newFieldDefinition()
+        .name("_class")
+        .description("Class Name")
+        .type(Scalars.GraphQLString)
+        .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource()).getSimpleName())
+        .build();;
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
     /*package*/ static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
         Job.class,
-        RunWithSCM.class
+        RunWithSCM.class,
+        Action.class
     ));
 
     /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
@@ -78,24 +84,27 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashSet<Class> interfaces = new HashSet(INTERFACES);
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
 
     private GraphQLOutputType createSchemaClassName(Class clazz) {
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
-        try {
-            MODEL_BUILDER.get(clazz);
-        } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            return Scalars.GraphQLString;
+
+        // interfaces are never exported, so handle them seperately
+        if (!Modifier.isInterface(clazz.getModifiers())) {
+            try {
+                MODEL_BUILDER.get(clazz);
+            } catch (org.kohsuke.stapler.export.NotExportableException e) {
+                return Scalars.GraphQLString;
+            }
+        } else {
+            interfaces.add(clazz);
         }
         classQueue.add(clazz);
-        GraphQLTypeReference graphQLTypeReference = GraphQLTypeReference.typeRef(clazz.getSimpleName());
-        if (graphQLTypeReference != null) {
-            return graphQLTypeReference;
-        }
-        throw new RuntimeException("No such clazz: " + clazz.getSimpleName());
+        return GraphQLTypeReference.typeRef(clazz.getSimpleName());
     }
 
     private Class getCollectionClass(Property p) {
@@ -103,31 +112,31 @@ public class Builders {
     }
 
     public void buildSchemaFromClass(Class clazz) {
-        if (graphQLTypes.containsKey(clazz)) {
+        if (graphQLTypes.containsKey(clazz.getName())) {
             return;
         }
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
 
-        fieldBuilder.name(clazz.getSimpleName())
-            .description("moo")
-            .field(
-                GraphQLFieldDefinition.newFieldDefinition()
-                    .name("_class")
-                    .description("Class Name")
-                    .type(Scalars.GraphQLString)
-                    .dataFetcher(dataFetcher -> dataFetcher.getSource().getClass().getSimpleName())
-                    .build()
-            );
+        fieldBuilder.name(clazz.getSimpleName()).field(classFieldDefinition);
 
         Model<?> model;
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            graphQLTypes.put(clazz, fieldBuilder);
+            fieldBuilder.withInterface(GraphQLTypeReference.typeRef("__" + clazz.getSimpleName()));
+
+            graphQLTypes.put(clazz.getName(), fieldBuilder);
+            graphQLTypes.put(
+                clazz.getPackage() + ".__" + clazz.getSimpleName(),
+                GraphQLObjectType.newObject()
+                    .name("__" + clazz.getSimpleName())
+                    .description("Generic implementation of " + clazz.getSimpleName() + "with just _class defined")
+                    .field(classFieldDefinition)
+            );
             return;
         }
 
-        for (Class topLevelClazz : INTERFACES) {
+        for (Class topLevelClazz : interfaces) {
             if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
                 fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
             }
@@ -169,14 +178,14 @@ public class Builders {
                 );
             }
         }
-        graphQLTypes.put(clazz, fieldBuilder);
+        graphQLTypes.put(clazz.getName(), fieldBuilder);
     }
 
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        for (Class clazz : Stream.concat(INTERFACES.stream(), TOP_LEVEL_CLASSES.stream()).toArray(Class[]::new)) {
+        for (Class clazz : Stream.concat(interfaces.stream(), TOP_LEVEL_CLASSES.stream()).toArray(Class[]::new)) {
             this.buildSchemaFromClass(clazz);
         }
 
@@ -202,16 +211,25 @@ public class Builders {
         HashSet<GraphQLType> types = new HashSet<>();
         GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
-        for (Class clazz : INTERFACES) {
-            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz).build());
+        for (Class clazz : interfaces) {
+            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz.getName()).build());
             types.add(interfaceType);
+            LOGGER.info("Interface:" + interfaceType.getName());
             codeRegistry.typeResolver(interfaceType.getName(), new TypeResolver() {
                 @Override
                 public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                    String name = env.getObject().getClass().getSimpleName();
-                    for (GraphQLType t : types) {
-                        if (t.getName().equals(name)) {
-                            return (GraphQLObjectType) t;
+                    Class realClazz = ClassUtils.getRealClass(env.getObject());
+                    String name = realClazz.getSimpleName();
+                    LOGGER.info(name);
+                    if (env.getSchema().getObjectType(name) != null) {
+                        return env.getSchema().getObjectType(name);
+                    }
+                    for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
+                        GraphQLObjectType objectType = env.getSchema().getObjectType(
+                            "__" + interfaceClazz.getSimpleName()
+                        );
+                        if (objectType != null) {
+                            return objectType;
                         }
                     }
                     return null;
