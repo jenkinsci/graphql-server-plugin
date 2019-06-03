@@ -3,40 +3,41 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
-import graphql.schema.GraphQLCodeRegistry;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
-import hudson.model.AbstractProject;
-import hudson.model.Actionable;
+import hudson.Extension;
+import hudson.model.Action;
 import hudson.model.Cause;
 import hudson.model.CauseAction;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
+import hudson.model.Job;
 import hudson.model.Run;
+import jenkins.model.TransientActionFactory;
 import net.sf.json.JSONObject;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.jvnet.hudson.test.JenkinsRule;
 import org.mockito.Mockito;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.GregorianCalendar;
-import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-@RunWith(PowerMockRunner.class)
-@PowerMockIgnore({"javax.crypto.*", "javax.security.*", "javax.net.ssl.*"})
-@PrepareForTest({FreeStyleProject.class, AbstractProject.class, Actionable.class})
+//@RunWith(PowerMockRunner.class)
+//@PowerMockIgnore({"javax.crypto.*", "javax.security.*", "javax.net.ssl.*"})
+//@PrepareForTest({FreeStyleProject.class, AbstractProject.class, Actionable.class})
 public class BuildersTest {
+    @Rule
+    public JenkinsRule j = new JenkinsRule();
 
     private Builders builder;
     private GraphQLSchema graphQLSchema;
@@ -65,32 +66,34 @@ public class BuildersTest {
         );
     }
 
+    @SuppressWarnings("rawtypes")
+    @Extension
+    public static class FakeCauseAction extends TransientActionFactory<Job> {
+        @Override
+        public Class<Job> type() {
+            return Job.class;
+        }
+
+        @Override
+        public Collection<? extends Action> createFor(Job j) {
+            return Collections.singleton(new CauseAction(new Cause() {
+                @Override
+                public String getShortDescription() {
+                    return "My Cause";
+                }
+            }));
+        }
+    }
+
     @Test
-    public void actions() {
-        PowerMockito.mockStatic(FreeStyleProject.class);
-        FreeStyleProject freeStyleProject = PowerMockito.mock(FreeStyleProject.class);
-        List actions = Arrays.asList(
-            new CauseAction(new Cause() {
-                @Override
-                public String getShortDescription() {
-                    return "My Cause";
-                }
-            }),
-            new CauseAction(new Cause() {
-                @Override
-                public String getShortDescription() {
-                    return "My Cause";
-                }
-            })
-        );
-        PowerMockito.when(freeStyleProject.getAllActions()).thenReturn(actions);
-        PowerMockito.when(freeStyleProject.getActions()).thenReturn(actions);
+    public void actions() throws IOException {
+        FreeStyleProject freeStyleProject = j.createFreeStyleProject();
 
         GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("Job");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"CauseAction\"},{\"_class\":\"CauseAction\"}]}}"),
+            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"CauseAction\"},{\"_class\":\"RenameAction\"}]}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }
