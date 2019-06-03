@@ -123,15 +123,16 @@ public class Builders {
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            fieldBuilder.withInterface(GraphQLTypeReference.typeRef("__" + clazz.getSimpleName()));
-
+            interfaces.add(clazz);
             graphQLTypes.put(clazz.getName(), fieldBuilder);
             graphQLTypes.put(
                 clazz.getPackage() + ".__" + clazz.getSimpleName(),
                 GraphQLObjectType.newObject()
                     .name("__" + clazz.getSimpleName())
-                    .description("Generic implementation of " + clazz.getSimpleName() + "with just _class defined")
+                    .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
                     .field(classFieldDefinition)
+                    .withInterface(GraphQLTypeReference.typeRef(clazz.getSimpleName()))
+
             );
             return;
         }
