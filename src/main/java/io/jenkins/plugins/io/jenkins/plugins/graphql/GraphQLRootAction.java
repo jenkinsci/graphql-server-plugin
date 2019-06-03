@@ -3,10 +3,12 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
+import hudson.DescriptorExtensionList;
 import hudson.Extension;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
+import hudson.model.TopLevelItemDescriptor;
 import hudson.model.User;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
@@ -21,11 +23,13 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @Extension
 @SuppressWarnings("unused")
@@ -54,6 +58,11 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() {
         Builders b = new Builders();
+        b.addExtraTopLevelClasses(
+            DescriptorExtensionList.lookup(TopLevelItemDescriptor.class).stream()
+                .map(d -> d.clazz)
+                .collect(Collectors.toList())
+        );
         builtSchema = GraphQL.newGraphQL(b.buildSchema()).build();
     }
 

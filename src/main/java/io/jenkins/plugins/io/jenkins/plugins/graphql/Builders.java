@@ -5,9 +5,29 @@ import com.google.common.collect.Lists;
 import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
 import graphql.scalars.ExtendedScalars;
-import graphql.schema.*;
-import hudson.DescriptorExtensionList;
-import hudson.model.*;
+import graphql.schema.Coercing;
+import graphql.schema.CoercingParseLiteralException;
+import graphql.schema.CoercingParseValueException;
+import graphql.schema.CoercingSerializeException;
+import graphql.schema.DataFetcher;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.GraphQLArgument;
+import graphql.schema.GraphQLCodeRegistry;
+import graphql.schema.GraphQLDirective;
+import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLInterfaceType;
+import graphql.schema.GraphQLList;
+import graphql.schema.GraphQLObjectType;
+import graphql.schema.GraphQLOutputType;
+import graphql.schema.GraphQLScalarType;
+import graphql.schema.GraphQLSchema;
+import graphql.schema.GraphQLType;
+import graphql.schema.GraphQLTypeReference;
+import graphql.schema.TypeResolver;
+import hudson.model.Action;
+import hudson.model.Items;
+import hudson.model.Job;
+import hudson.model.User;
 import io.jenkins.plugins.io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
@@ -17,7 +37,16 @@ import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -28,12 +57,16 @@ public class Builders {
     private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
-    static final private GraphQLFieldDefinition classFieldDefinition = GraphQLFieldDefinition.newFieldDefinition()
-        .name("_class")
-        .description("Class Name")
-        .type(Scalars.GraphQLString)
-        .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource()).getSimpleName())
-        .build();;
+    static private GraphQLFieldDefinition makeClassFieldDefinition() {
+        return GraphQLFieldDefinition.newFieldDefinition()
+            .name("_class")
+            .description("Class Name")
+            .type(Scalars.GraphQLString)
+            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource()).getSimpleName())
+//          .type(AdditionalScalarTypes.CLASS_SCALAR)
+            .build();
+    }
+
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
@@ -87,6 +120,7 @@ public class Builders {
     private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
     private HashSet<Class> interfaces = new HashSet(INTERFACES);
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
+    private List<Class> extraTopLevelClasses = new ArrayList<>();
 
     private GraphQLOutputType createSchemaClassName(Class clazz) {
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
@@ -117,7 +151,7 @@ public class Builders {
         }
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
 
-        fieldBuilder.name(clazz.getSimpleName()).field(classFieldDefinition);
+        fieldBuilder.name(clazz.getSimpleName()).field(makeClassFieldDefinition());
 
         Model<?> model;
         try {
@@ -130,7 +164,7 @@ public class Builders {
                 GraphQLObjectType.newObject()
                     .name("__" + clazz.getSimpleName())
                     .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
-                    .field(classFieldDefinition)
+                    .field(makeClassFieldDefinition())
                     .withInterface(GraphQLTypeReference.typeRef(clazz.getSimpleName()))
 
             );
@@ -194,12 +228,12 @@ public class Builders {
             queryType = builAllQuery(queryType, clazz);
         }
 
-        for (TopLevelItemDescriptor d : DescriptorExtensionList.lookup(TopLevelItemDescriptor.class)) {
-            if (!Modifier.isAbstract(d.clazz.getModifiers())) {
+        for (Class clazz : this.extraTopLevelClasses) {
+            if (!Modifier.isAbstract(clazz.getModifiers())) {
                 for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
-                    if (d.clazz != topLevelClazz && topLevelClazz.isAssignableFrom(d.clazz)) {
-                        classQueue.add(d.clazz);
-                        queryType = builAllQuery(queryType, d.clazz);
+                    if (clazz != topLevelClazz && topLevelClazz.isAssignableFrom(clazz)) {
+                        classQueue.add(clazz);
+                        queryType = builAllQuery(queryType, clazz);
                     }
                 }
             }
@@ -317,5 +351,9 @@ public class Builders {
                 }
             })
         );
+    }
+
+    public void addExtraTopLevelClasses(List<Class> clazzes) {
+        this.extraTopLevelClasses.addAll(clazzes);
     }
 }

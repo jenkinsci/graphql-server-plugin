@@ -3,28 +3,40 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
-import graphql.TypeResolutionEnvironment;
-import graphql.schema.*;
-import hudson.model.*;
+import graphql.schema.GraphQLCodeRegistry;
+import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLInterfaceType;
+import graphql.schema.GraphQLObjectType;
+import graphql.schema.GraphQLOutputType;
+import graphql.schema.GraphQLSchema;
+import hudson.model.AbstractProject;
+import hudson.model.Actionable;
+import hudson.model.Cause;
+import hudson.model.CauseAction;
+import hudson.model.FreeStyleBuild;
+import hudson.model.FreeStyleProject;
+import hudson.model.Run;
 import net.sf.json.JSONObject;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.WithoutJenkins;
-import org.mockito.Mock;
+import org.junit.runner.RunWith;
 import org.mockito.Mockito;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.GregorianCalendar;
-import java.util.concurrent.ExecutionException;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
+@RunWith(PowerMockRunner.class)
+@PowerMockIgnore({"javax.crypto.*", "javax.security.*", "javax.net.ssl.*"})
+@PrepareForTest({FreeStyleProject.class, AbstractProject.class, Actionable.class})
 public class BuildersTest {
-    @Rule
-    public JenkinsRule jenkinsRule = new JenkinsRule();
 
     private Builders builder;
     private GraphQLSchema graphQLSchema;
@@ -32,11 +44,11 @@ public class BuildersTest {
     @Before
     public void setup() {
         builder = new Builders();
+        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
         graphQLSchema = builder.buildSchema();
     }
 
     @Test
-    @WithoutJenkins
     public void timestampAsRFC() throws IOException {
         GregorianCalendar c = new GregorianCalendar();
         c.setTimeInMillis(1559344577604L);
@@ -54,32 +66,37 @@ public class BuildersTest {
     }
 
     @Test
-    public void actions() throws IOException, InterruptedException, ExecutionException {
-        FreeStyleProject freeStyleProject = Mockito.mock(FreeStyleProject.class);
-        Mockito.when(freeStyleProject.getActions()).thenReturn(Arrays.asList(
+    public void actions() {
+        PowerMockito.mockStatic(FreeStyleProject.class);
+        FreeStyleProject freeStyleProject = PowerMockito.mock(FreeStyleProject.class);
+        List actions = Arrays.asList(
+            new CauseAction(new Cause() {
+                @Override
+                public String getShortDescription() {
+                    return "My Cause";
+                }
+            }),
             new CauseAction(new Cause() {
                 @Override
                 public String getShortDescription() {
                     return "My Cause";
                 }
             })
-        ));
+        );
+        PowerMockito.when(freeStyleProject.getAllActions()).thenReturn(actions);
+        PowerMockito.when(freeStyleProject.getActions()).thenReturn(actions);
+
         GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("Job");
-        ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "actions { _class }");
+        ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\": {\"timestamp\": \"2019-05-31T23:16:17.604Z\"}}"),
+            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"CauseAction\"},{\"_class\":\"CauseAction\"}]}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }
 
     private ExecutionResult _queryDataSet(GraphQLSchema existingSchema, Object data, GraphQLOutputType graphqlRun, String fields) {
         GraphQLSchema builtSchema;
-        GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry(existingSchema.getCodeRegistry());
-//        codeRegistry.typeResolver("Job", env -> {
-//            String name = Builders.getRealClass(env.getObject()).getSimpleName();
-//            return existingSchema.getObjectType(FreeStyleProject.class.getSimpleName());
-//        });
 
         builtSchema = GraphQLSchema.newSchema(existingSchema)
             .query(
@@ -90,7 +107,6 @@ public class BuildersTest {
                     .build()
                 ).build()
             )
-            .codeRegistry(codeRegistry.build())
             .additionalType(graphqlRun)
             .build();
 
