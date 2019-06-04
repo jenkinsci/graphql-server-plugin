@@ -17,6 +17,9 @@ query {
   allJobs {
     name
     _class
+    actions {
+      _class
+    }
     allBuilds {
       _class
       actions {
