@@ -19,7 +19,16 @@ query {
     _class
     allBuilds {
       _class
-      actions
+      actions {
+        _class
+        ... on CauseAction {
+          _class
+          causes {
+            _class
+            shortDescription
+          }
+        }
+      }
       artifacts {
         _class
         displayPath
