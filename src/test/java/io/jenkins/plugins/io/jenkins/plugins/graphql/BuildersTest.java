@@ -1,120 +1,53 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
-import graphql.ExecutionInput;
-import graphql.ExecutionResult;
-import graphql.GraphQL;
-import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
-import graphql.schema.GraphQLSchema;
-import hudson.Extension;
-import hudson.model.Action;
-import hudson.model.Cause;
-import hudson.model.CauseAction;
-import hudson.model.FreeStyleBuild;
-import hudson.model.FreeStyleProject;
-import hudson.model.Job;
-import hudson.model.Run;
-import jenkins.model.TransientActionFactory;
-import net.sf.json.JSONObject;
-import org.junit.Before;
-import org.junit.Rule;
+import graphql.schema.GraphQLTypeReference;
+import org.junit.Assert;
 import org.junit.Test;
-import org.jvnet.hudson.test.JenkinsRule;
-import org.mockito.Mockito;
+import org.kohsuke.stapler.export.Exported;
+import org.kohsuke.stapler.export.ExportedBean;
 
-import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.GregorianCalendar;
+import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-
-//@RunWith(PowerMockRunner.class)
-//@PowerMockIgnore({"javax.crypto.*", "javax.security.*", "javax.net.ssl.*"})
-//@PrepareForTest({FreeStyleProject.class, AbstractProject.class, Actionable.class})
 public class BuildersTest {
-    @Rule
-    public JenkinsRule j = new JenkinsRule();
-
-    private Builders builder;
-    private GraphQLSchema graphQLSchema;
-
-    @Before
-    public void setup() {
-        builder = new Builders();
-        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
-        graphQLSchema = builder.buildSchema();
+    @ExportedBean
+    private class TestExportedClass {
+        @Exported
+        public String getString() { return "String"; }
+        @Exported
+        public String[] getArrayString () { return new String[] { "Hi", "There" }; }
+        @Exported
+        public List<String> getListString () { return Arrays.asList("Hi", "There"); }
     }
 
     @Test
-    public void timestampAsRFC() throws IOException {
-        GregorianCalendar c = new GregorianCalendar();
-        c.setTimeInMillis(1559344577604L);
+    public void buildObjectForArray() {
+        Builders builders = new Builders() {
+            @Override
+            protected GraphQLOutputType createSchemaClassName(Class clazz) {
+                return GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz));
+            }
+        };
 
-        Run run = Mockito.mock(FreeStyleBuild.class);
-        Mockito.when(run.getTimestamp()).thenReturn(c);
-
-        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("Run");
-        ExecutionResult executeResult = _queryDataSet(graphQLSchema, run, graphqlRun, "timestamp");
-
-        assertEquals(
-            JSONObject.fromObject("{\"test\": {\"timestamp\": \"2019-05-31T23:16:17.604Z\"}}"),
-            JSONObject.fromObject(executeResult.getData())
+        GraphQLObjectType graphQLObjectType = builders.buildGraphQLTypeFromModel(TestExportedClass.class).build();
+        Assert.assertEquals(
+            null,
+            graphQLObjectType.getDescription()
         );
-    }
-
-    @SuppressWarnings("rawtypes")
-    @Extension
-    public static class FakeCauseAction extends TransientActionFactory<Job> {
-        @Override
-        public Class<Job> type() {
-            return Job.class;
-        }
-
-        @Override
-        public Collection<? extends Action> createFor(Job j) {
-            return Collections.singleton(new CauseAction(new Cause() {
-                @Override
-                public String getShortDescription() {
-                    return "My Cause";
-                }
-            }));
-        }
-    }
-
-    @Test
-    public void actions() throws IOException {
-        FreeStyleProject freeStyleProject = j.createFreeStyleProject();
-
-        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("Job");
-        ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
-
-        assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"CauseAction\"},{\"_class\":\"RenameAction\"}]}}"),
-            JSONObject.fromObject(executeResult.getData())
+        Assert.assertEquals(
+            "String",
+            graphQLObjectType.getFieldDefinition("string").getType().getName()
         );
-    }
-
-    private ExecutionResult _queryDataSet(GraphQLSchema existingSchema, Object data, GraphQLOutputType graphqlRun, String fields) {
-        GraphQLSchema builtSchema;
-
-        builtSchema = GraphQLSchema.newSchema(existingSchema)
-            .query(
-                GraphQLObjectType.newObject().name("QueryType").field(GraphQLFieldDefinition.newFieldDefinition()
-                    .name("test")
-                    .type(graphqlRun)
-                    .dataFetcher(environment -> data)
-                    .build()
-                ).build()
-            )
-            .additionalType(graphqlRun)
-            .build();
-
-        ExecutionInput executionInput = ExecutionInput.newExecutionInput().query("query { test { " + fields + " } }").build();
-        return GraphQL.newGraphQL(builtSchema).build().execute(executionInput);
+        Assert.assertEquals(
+            "[String]",
+            graphQLObjectType.getFieldDefinition("arrayString").getType().toString()
+        );
+        Assert.assertEquals(
+            "[String]",
+            graphQLObjectType.getFieldDefinition("listString").getType().toString()
+        );
     }
 
 }

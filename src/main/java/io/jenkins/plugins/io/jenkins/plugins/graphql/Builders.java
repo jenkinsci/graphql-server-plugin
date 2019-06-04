@@ -20,7 +20,6 @@ import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
-import hudson.model.Action;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
@@ -115,7 +114,7 @@ public class Builders {
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
-    private GraphQLOutputType createSchemaClassName(Class clazz) {
+    protected GraphQLOutputType createSchemaClassName(Class clazz) {
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
@@ -145,14 +144,12 @@ public class Builders {
         if (graphQLTypes.containsKey(clazz.getName())) {
             return;
         }
-        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-
-        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
-
         Model<?> model;
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
+            GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
+            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
             // interfaces.add(clazz);
             graphQLTypes.put(clazz.getName(), fieldBuilder);
             graphQLTypes.put(
@@ -166,20 +163,28 @@ public class Builders {
             );
             return;
         }
+        graphQLTypes.put(clazz.getName(), buildGraphQLTypeFromModel(clazz));
+    }
 
-        for (Class topLevelClazz : interfaces) {
-            if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
-                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
-            }
-        }
+    protected GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
+        Model<?> model = MODEL_BUILDER.get(clazz);
 
-        ArrayList<Model<?>> queue = new ArrayList();
+        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
+        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());;
+
+        ArrayList<Model<?>> queue = new ArrayList<>();
         queue.add(model);
 
         Model<?> superModel = model.superModel;
         while (superModel != null) {
             queue.add(superModel);
             superModel = superModel.superModel;
+        }
+
+        for (Class<?> topLevelClazz : interfaces) {
+            if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
+                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
+            }
         }
 
         for (Model<?> _model : queue) {
@@ -192,6 +197,8 @@ public class Builders {
                 GraphQLOutputType className = null;
                 if ("id".equals(p.name)) {
                     className = Scalars.GraphQLID;
+                } else if (propertyClazz.isArray()) {
+                    className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (propertyClazz.isInstance(Object[].class)) {
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (Collection.class.isAssignableFrom(propertyClazz)) {
@@ -209,7 +216,7 @@ public class Builders {
                 );
             }
         }
-        graphQLTypes.put(clazz.getName(), fieldBuilder);
+        return fieldBuilder;
     }
 
     @SuppressWarnings("rawtypes")
