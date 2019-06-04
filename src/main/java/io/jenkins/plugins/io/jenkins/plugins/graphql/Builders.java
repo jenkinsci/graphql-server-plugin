@@ -115,6 +115,9 @@ public class Builders {
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
     protected GraphQLOutputType createSchemaClassName(Class clazz) {
+        assert(clazz != null);
+        assert(clazz.getSimpleName() != null);
+
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
@@ -200,6 +203,9 @@ public class Builders {
                 } else if (propertyClazz.isArray()) {
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (propertyClazz.isInstance(Object[].class)) {
+                    System.out.println(p.name + ":" + model.type.toString());
+                    System.err.println(p.name + ":" + model.type.toString());
+
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (Collection.class.isAssignableFrom(propertyClazz)) {
                     className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));

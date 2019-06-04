@@ -69,24 +69,24 @@ public class GraphQLSchemaGeneratorTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
-    @Extension
-    public static class FakeCauseAction extends TransientActionFactory<Job> {
-        @Override
-        public Class<Job> type() {
-            return Job.class;
-        }
-
-        @Override
-        public Collection<? extends Action> createFor(Job j) {
-            return Collections.singleton(new CauseAction(new Cause() {
-                @Override
-                public String getShortDescription() {
-                    return "My Cause";
-                }
-            }));
-        }
-    }
+//    @SuppressWarnings("rawtypes")
+//    @Extension
+//    public static class FakeCauseAction extends TransientActionFactory<Job> {
+//        @Override
+//        public Class<Job> type() {
+//            return Job.class;
+//        }
+//
+//        @Override
+//        public Collection<? extends Action> createFor(Job j) {
+//            return Collections.singleton(new CauseAction(new Cause() {
+//                @Override
+//                public String getShortDescription() {
+//                    return "My Cause";
+//                }
+//            }));
+//        }
+//    }
 
     @Test
     public void actions() throws IOException {
@@ -96,7 +96,7 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"CauseAction\"},{\"_class\":\"RenameAction\"}]}}"),
+            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"RenameAction\"},{\"_class\":\"ViewCredentialsAction\"}]}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }
@@ -136,47 +136,16 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(getIntrospectionQuery()).build();
         ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
 
+//        System.out.println(new Gson().toJson(new Gson().fromJson(
+//            new Gson().toJson(getSchemaType(executionResult, "Action")),
+//            HashMap[].class
+//        )));
         assertArrayEquals(
             new Gson().fromJson("[\n" +
                 "  {\n" +
                 "    \"inputFields\": {},\n" +
                 "    \"interfaces\": {},\n" +
                 "    \"possibleTypes\": [\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"CauseAction\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"GraphQLRootAction\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"InterruptedBuildAction\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"MyViewsProperty\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"ParametersAction\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"ParametersDefinitionProperty\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"WhoAmI\",\n" +
-                "        \"ofType\": {}\n" +
-                "      },\n" +
                 "      {\n" +
                 "        \"kind\": \"OBJECT\",\n" +
                 "        \"name\": \"__Action\",\n" +
