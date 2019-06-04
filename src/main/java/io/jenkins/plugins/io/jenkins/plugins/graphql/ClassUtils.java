@@ -9,15 +9,21 @@ import java.util.Set;
 public class ClassUtils {
     static final String ENHANCER = "$MockitoMock$";
 
+    // FIXME - memoize
     public static Set<Class<?>> getAllInterfaces(Class instance) {
         Set<Class<?>> interfaces = new HashSet<>();
+        if (instance == null) {
+            return interfaces;
+        }
         for (Class interfaceClazz : instance.getInterfaces()) {
             interfaces.add(interfaceClazz);
             interfaces.addAll(getAllInterfaces(interfaceClazz));
         }
+        interfaces.addAll(getAllInterfaces(instance.getSuperclass()));
         return interfaces;
     }
 
+    // FIXME - memoize (maybe)
     public static Class getRealClass(Class clazz) {
         Class type = clazz;
         while(type.getSimpleName().contains(ClassUtils.ENHANCER)) {
@@ -27,6 +33,7 @@ public class ClassUtils {
         return type;
     }
 
+    // FIXME - memoize
     public static String getGraphQLClassName(Class clazz) {
         return getRealClass(clazz).getSimpleName().replaceAll("[^_0-9A-Za-z]", "_");
     }
