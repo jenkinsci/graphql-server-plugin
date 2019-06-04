@@ -23,4 +23,8 @@ public class ClassUtils {
 
         return type;
     }
+
+    public static String getGraphQLClassName(Class clazz) {
+        return getRealClass(clazz).getSimpleName().replaceAll("[^_0-9A-Za-z]", "_");
+    }
 }

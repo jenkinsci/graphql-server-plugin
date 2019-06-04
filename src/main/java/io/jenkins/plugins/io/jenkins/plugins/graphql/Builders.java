@@ -1,14 +1,11 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
 import graphql.scalars.ExtendedScalars;
-import graphql.schema.Coercing;
-import graphql.schema.CoercingParseLiteralException;
-import graphql.schema.CoercingParseValueException;
-import graphql.schema.CoercingSerializeException;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLArgument;
@@ -19,12 +16,12 @@ import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
-import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
 import hudson.model.Action;
+import hudson.model.CauseAction;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
@@ -35,6 +32,7 @@ import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
+import org.reflections.Reflections;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -50,8 +48,6 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static com.google.common.collect.Iterators.skip;
 
 public class Builders {
     private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
@@ -136,6 +132,19 @@ public class Builders {
             }
         } else {
             interfaces.add(clazz);
+            for (Package pkg :  Package.getPackages()) {
+                if (pkg.getName().toLowerCase().contains("jenkins") || pkg.getName().toLowerCase().contains("hudson")) {
+                    Reflections reflections = new Reflections(pkg.getName());
+                    for (Object subTypeClassObj : reflections.getSubTypesOf(clazz)) {
+                        Class subTypeClazz = (Class) subTypeClassObj;
+                        try {
+                            MODEL_BUILDER.get(subTypeClazz);
+                            classQueue.add(subTypeClazz);
+                        } catch (org.kohsuke.stapler.export.NotExportableException e) {
+                        }
+                    }
+                }
+            }
         }
         classQueue.add(clazz);
         return GraphQLTypeReference.typeRef(clazz.getSimpleName());
@@ -151,21 +160,21 @@ public class Builders {
         }
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
 
-        fieldBuilder.name(clazz.getSimpleName()).field(makeClassFieldDefinition());
+        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
 
         Model<?> model;
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            interfaces.add(clazz);
+            // interfaces.add(clazz);
             graphQLTypes.put(clazz.getName(), fieldBuilder);
             graphQLTypes.put(
                 clazz.getPackage() + ".__" + clazz.getSimpleName(),
                 GraphQLObjectType.newObject()
-                    .name("__" + clazz.getSimpleName())
+                    .name("__" + ClassUtils.getGraphQLClassName(clazz))
                     .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
                     .field(makeClassFieldDefinition())
-                    .withInterface(GraphQLTypeReference.typeRef(clazz.getSimpleName()))
+                    .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
             return;
@@ -240,7 +249,10 @@ public class Builders {
         }
 
         while (!classQueue.isEmpty()) {
-            this.buildSchemaFromClass(classQueue.poll());
+            Class clazz = classQueue.poll();
+            if (clazz == Object.class) { continue; }
+            if (clazz == Class.class) { continue; }
+            this.buildSchemaFromClass(clazz);
         }
 
         HashSet<GraphQLType> types = new HashSet<>();
@@ -319,13 +331,8 @@ public class Builders {
                 .defaultValue(100)
             )
             .dataFetcher(new DataFetcher<Object>() {
-                public Iterator<?> slice(Iterator<?> base, int start, int limit) {
-                    // fast-forward
-                    int skipped = skip(base, start);
-                    if (skipped < start) { //already at the end, nothing to return
-                        Iterators.emptyIterator();
-                    }
-                    return Iterators.limit(base, limit);
+                public Iterator<?> slice(Iterable<?> base, int start, int limit) {
+                    return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
                 }
 
                 @Override
@@ -335,7 +342,7 @@ public class Builders {
 
 
                     if (clazz == User.class) {
-                        return Lists.newArrayList(slice(User.getAll().iterator(), offset, limit));
+                        return Lists.newArrayList(slice(User.getAll(), offset, limit));
                     }
 
                     Iterable<?> items = Items.allItems(
@@ -344,7 +351,7 @@ public class Builders {
                         clazz
                     );
                     return Lists.newArrayList(slice(
-                        items.iterator(),
+                        items,
                         offset,
                         limit
                     ));
