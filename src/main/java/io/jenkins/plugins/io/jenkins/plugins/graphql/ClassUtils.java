@@ -1,5 +1,8 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import org.kohsuke.stapler.export.ModelBuilder;
+import org.reflections.Reflections;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,8 +18,8 @@ public class ClassUtils {
         return interfaces;
     }
 
-    public static Class<? extends Object> getRealClass(Object instance) {
-        Class<? extends Object> type = instance.getClass();
+    public static Class getRealClass(Class clazz) {
+        Class type = clazz;
         while(type.getSimpleName().contains(ClassUtils.ENHANCER)) {
             type = type.getSuperclass();
         }
@@ -26,5 +29,23 @@ public class ClassUtils {
 
     public static String getGraphQLClassName(Class clazz) {
         return getRealClass(clazz).getSimpleName().replaceAll("[^_0-9A-Za-z]", "_");
+    }
+
+    public static Set<Class> findSubclasses(ModelBuilder MODEL_BUILDER, Class clazz) {
+        Set<Class> subClasses = new HashSet<>();
+        for (Package pkg :  Package.getPackages()) {
+            if (pkg.getName().toLowerCase().contains("jenkins") || pkg.getName().toLowerCase().contains("hudson")) {
+                Reflections reflections = new Reflections(pkg.getName());
+                for (Object subTypeClassObj : reflections.getSubTypesOf(clazz)) {
+                    Class subTypeClazz = (Class) subTypeClassObj;
+                    try {
+                        MODEL_BUILDER.get(subTypeClazz);
+                        subClasses.add(subTypeClazz);
+                    } catch (org.kohsuke.stapler.export.NotExportableException e) {
+                    }
+                }
+            }
+        }
+        return subClasses;
     }
 }

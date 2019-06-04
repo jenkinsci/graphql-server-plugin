@@ -21,7 +21,6 @@ import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
 import hudson.model.Action;
-import hudson.model.CauseAction;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
@@ -32,7 +31,6 @@ import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
-import org.reflections.Reflections;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -58,7 +56,7 @@ public class Builders {
             .name("_class")
             .description("Class Name")
             .type(Scalars.GraphQLString)
-            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource()).getSimpleName())
+            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getSimpleName())
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
     }
@@ -68,8 +66,7 @@ public class Builders {
 
     /*package*/ static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
         Job.class,
-        RunWithSCM.class,
-        Action.class
+        RunWithSCM.class
     ));
 
     /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
@@ -131,23 +128,13 @@ public class Builders {
                 return Scalars.GraphQLString;
             }
         } else {
-            interfaces.add(clazz);
-            for (Package pkg :  Package.getPackages()) {
-                if (pkg.getName().toLowerCase().contains("jenkins") || pkg.getName().toLowerCase().contains("hudson")) {
-                    Reflections reflections = new Reflections(pkg.getName());
-                    for (Object subTypeClassObj : reflections.getSubTypesOf(clazz)) {
-                        Class subTypeClazz = (Class) subTypeClassObj;
-                        try {
-                            MODEL_BUILDER.get(subTypeClazz);
-                            classQueue.add(subTypeClazz);
-                        } catch (org.kohsuke.stapler.export.NotExportableException e) {
-                        }
-                    }
-                }
+            if (!interfaces.contains(clazz)) {
+                interfaces.add(clazz);
+                classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
             }
         }
         classQueue.add(clazz);
-        return GraphQLTypeReference.typeRef(clazz.getSimpleName());
+        return GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz));
     }
 
     private Class getCollectionClass(Property p) {
@@ -265,7 +252,7 @@ public class Builders {
             codeRegistry.typeResolver(interfaceType.getName(), new TypeResolver() {
                 @Override
                 public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                    Class realClazz = ClassUtils.getRealClass(env.getObject());
+                    Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
                     String name = realClazz.getSimpleName();
                     LOGGER.info(name);
                     if (env.getSchema().getObjectType(name) != null) {

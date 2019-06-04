@@ -1,15 +1,13 @@
 package io.jenkins.plugins.io.jenkins.plugins.graphql;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Resources;
 import com.google.gson.Gson;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLSchema;
-import com.google.common.io.Resources;
-import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
-import com.google.common.base.Charsets;
-import net.sf.json.test.JSONAssert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -18,7 +16,7 @@ import org.jvnet.hudson.test.WithoutJenkins;
 import java.io.IOException;
 import java.util.HashMap;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
 
 public class GraphQLSchemaGeneratorTest {
     @Rule
@@ -39,9 +37,54 @@ public class GraphQLSchemaGeneratorTest {
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(getIntrospectionQuery()).build();
         ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+
         assertArrayEquals(
             new Gson().fromJson("[\n" +
                 "  {\n" +
+                "    \"inputFields\": {},\n" +
+                "    \"interfaces\": {},\n" +
+                "    \"possibleTypes\": [\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"CauseAction\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"GraphQLRootAction\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"InterruptedBuildAction\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"MyViewsProperty\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"ParametersAction\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"ParametersDefinitionProperty\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"WhoAmI\",\n" +
+                "        \"ofType\": {}\n" +
+                "      },\n" +
+                "      {\n" +
+                "        \"kind\": \"OBJECT\",\n" +
+                "        \"name\": \"__Action\",\n" +
+                "        \"ofType\": {}\n" +
+                "      }\n" +
+                "    ],\n" +
                 "    \"kind\": \"INTERFACE\",\n" +
                 "    \"name\": \"Action\",\n" +
                 "    \"description\": {},\n" +
@@ -59,10 +102,7 @@ public class GraphQLSchemaGeneratorTest {
                 "        \"deprecationReason\": {}\n" +
                 "      }\n" +
                 "    ],\n" +
-                "    \"inputFields\": {},\n" +
-                "    \"interfaces\": {},\n" +
-                "    \"enumValues\": {},\n" +
-                "    \"possibleTypes\": [{\"kind\"=\"OBJECT\", name=\"__Action\", \"ofType\"={}}]\n" +
+                "    \"enumValues\": {}\n" +
                 "  }\n" +
                 "]", HashMap[].class),
             new Gson().fromJson(
@@ -71,9 +111,23 @@ public class GraphQLSchemaGeneratorTest {
             )
         );
 
+//        System.out.println(new Gson().toJson(new Gson().fromJson(
+//            new Gson().toJson(getSchemaType(executionResult, "__Action")),
+//            HashMap[].class
+//        )));
+
         assertArrayEquals(
             new Gson().fromJson("[\n" +
                 "  {\n" +
+                "    \"inputFields\": {},\n" +
+                "    \"interfaces\": [\n" +
+                "      {\n" +
+                "        \"kind\": \"INTERFACE\",\n" +
+                "        \"name\": \"Action\",\n" +
+                "        \"ofType\": {}\n" +
+                "      }\n" +
+                "    ],\n" +
+                "    \"possibleTypes\": {},\n" +
                 "    \"kind\": \"OBJECT\",\n" +
                 "    \"name\": \"__Action\",\n" +
                 "    \"description\": \"Generic implementation of Action with just _class defined\",\n" +
@@ -91,10 +145,7 @@ public class GraphQLSchemaGeneratorTest {
                 "        \"deprecationReason\": {}\n" +
                 "      }\n" +
                 "    ],\n" +
-                "    \"inputFields\": {},\n" +
-                "    \"interfaces\": [{\"kind\"=\"INTERFACE\", name=\"Action\", \"ofType\"={}}],\n" +
-                "    \"enumValues\": {},\n" +
-                "    \"possibleTypes\": {}\n" +
+                "    \"enumValues\": {}\n" +
                 "  }\n" +
                 "]", HashMap[].class),
             new Gson().fromJson(
