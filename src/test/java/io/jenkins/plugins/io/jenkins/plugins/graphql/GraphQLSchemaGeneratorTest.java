@@ -3,6 +3,7 @@ package io.jenkins.plugins.io.jenkins.plugins.graphql;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -21,6 +22,7 @@ import hudson.model.Job;
 import hudson.model.Run;
 import jenkins.model.TransientActionFactory;
 import net.sf.json.JSONObject;
+import net.sf.json.JSONSerializer;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -29,6 +31,7 @@ import org.jvnet.hudson.test.WithoutJenkins;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -127,33 +130,16 @@ public class GraphQLSchemaGeneratorTest {
         );
     }
 
-    @Test
-    @WithoutJenkins
-    public void generateSchemaString() throws IOException {
-        Builders builder = new Builders();
-        GraphQLSchema graphQLSchema = builder.buildSchema();
+    private static class SchemaTypeResponse {
+        private final HashMap<String, Object> data = new HashMap<>();
 
-        ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(getIntrospectionQuery()).build();
-        ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
-
-//        System.out.println(new Gson().toJson(new Gson().fromJson(
-//            new Gson().toJson(getSchemaType(executionResult, "Action")),
-//            HashMap[].class
-//        )));
-        assertArrayEquals(
-            new Gson().fromJson("[\n" +
-                "  {\n" +
+        private SchemaTypeResponse() {
+            this.data.putAll(new Gson().fromJson("{\n" +
                 "    \"inputFields\": {},\n" +
                 "    \"interfaces\": {},\n" +
-                "    \"possibleTypes\": [\n" +
-                "      {\n" +
-                "        \"kind\": \"OBJECT\",\n" +
-                "        \"name\": \"__Action\",\n" +
-                "        \"ofType\": {}\n" +
-                "      }\n" +
-                "    ],\n" +
-                "    \"kind\": \"INTERFACE\",\n" +
-                "    \"name\": \"Action\",\n" +
+                "    \"possibleTypes\": {},\n" +
+                "    \"kind\": \"Object\",\n" +
+                "    \"name\": \"\",\n" +
                 "    \"description\": {},\n" +
                 "    \"fields\": [\n" +
                 "      {\n" +
@@ -170,8 +156,70 @@ public class GraphQLSchemaGeneratorTest {
                 "      }\n" +
                 "    ],\n" +
                 "    \"enumValues\": {}\n" +
-                "  }\n" +
-                "]", HashMap[].class),
+                "  }\n", new TypeToken<HashMap<String, Object>>() {}.getType()));
+        }
+
+        static SchemaTypeResponse newSchemaTypeResponse() {
+            return new SchemaTypeResponse();
+        }
+
+        public SchemaTypeResponse name(String name) {
+            this.data.put("name", name);
+            return this;
+        }
+
+        public SchemaTypeResponse description(String description) {
+            this.data.put("description", description);
+            return this;
+        }
+
+        public SchemaTypeResponse kind(String anInterface) {
+            this.data.put("kind", anInterface.toUpperCase());
+            return this;
+        }
+
+        public HashMap<String, Object> toHashMap() {
+            return this.data;
+        }
+
+        public SchemaTypeResponse possibleTypes(String json) {
+            ArrayList<Object> possibleTypes = new ArrayList<>();
+            if (this.data.get("possibleTypes") instanceof ArrayList) {
+                possibleTypes = (ArrayList<Object>) this.data.get("possibleTypes");
+            }
+            possibleTypes.add(new Gson().fromJson(json, HashMap.class));
+            this.data.put("possibleTypes", possibleTypes);
+            return this;
+        }
+
+        public SchemaTypeResponse interfaces(String json) {
+            ArrayList<Object> interfaces = new ArrayList<>();
+            if (this.data.get("interfaces") instanceof ArrayList) {
+                interfaces = (ArrayList<Object>) this.data.get("interfaces");
+            }
+            interfaces.add(new Gson().fromJson(json, HashMap.class));
+            this.data.put("interfaces", interfaces);
+            return this;
+        }
+    }
+
+    @Test
+    @WithoutJenkins
+    public void generateSchemaString() throws IOException {
+        Builders builder = new Builders();
+        GraphQLSchema graphQLSchema = builder.buildSchema();
+
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(getIntrospectionQuery()).build();
+        ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+
+        assertArrayEquals(
+            new HashMap[] {
+                SchemaTypeResponse.newSchemaTypeResponse()
+                    .name("Action")
+                    .kind("INTERFACE")
+                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__Action\", \"ofType\":{}}")
+                    .toHashMap()
+            },
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "Action")),
                 HashMap[].class
@@ -184,37 +232,18 @@ public class GraphQLSchemaGeneratorTest {
 //        )));
 
         assertArrayEquals(
-            new Gson().fromJson("[\n" +
-                "  {\n" +
-                "    \"inputFields\": {},\n" +
-                "    \"interfaces\": [\n" +
-                "      {\n" +
-                "        \"kind\": \"INTERFACE\",\n" +
-                "        \"name\": \"Action\",\n" +
-                "        \"ofType\": {}\n" +
-                "      }\n" +
-                "    ],\n" +
-                "    \"possibleTypes\": {},\n" +
-                "    \"kind\": \"OBJECT\",\n" +
-                "    \"name\": \"__Action\",\n" +
-                "    \"description\": \"Generic implementation of Action with just _class defined\",\n" +
-                "    \"fields\": [\n" +
-                "      {\n" +
-                "        \"name\": \"_class\",\n" +
-                "        \"description\": \"Class Name\",\n" +
-                "        \"args\": [],\n" +
-                "        \"type\": {\n" +
-                "          \"kind\": \"SCALAR\",\n" +
-                "          \"name\": \"String\",\n" +
-                "          \"ofType\": {}\n" +
-                "        },\n" +
-                "        \"isDeprecated\": false,\n" +
-                "        \"deprecationReason\": {}\n" +
-                "      }\n" +
-                "    ],\n" +
-                "    \"enumValues\": {}\n" +
-                "  }\n" +
-                "]", HashMap[].class),
+            new HashMap[] {
+                SchemaTypeResponse.newSchemaTypeResponse()
+                    .name("__Action")
+                    .description("Generic implementation of Action with just _class defined")
+                    .kind("OBJECT")
+                    .interfaces("{\n" +
+                        "        \"kind\": \"INTERFACE\",\n" +
+                        "        \"name\": \"Action\",\n" +
+                        "        \"ofType\": {}\n" +
+                        "      }\n")
+                    .toHashMap()
+            },
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "__Action")),
                 HashMap[].class
@@ -224,7 +253,7 @@ public class GraphQLSchemaGeneratorTest {
 
     private Object[] getSchemaType(ExecutionResult executionResult, String typeName) {
         return JSONObject.fromObject(executionResult.getData()).getJSONObject("__schema").getJSONArray("types").stream().filter(
-            type -> ((JSONObject)type).getString("name").equals(typeName)
+            type -> ((JSONObject) type).getString("name").equals(typeName)
         ).toArray();
     }
 }
