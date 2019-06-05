@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.graphql;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
@@ -23,7 +23,7 @@ import graphql.schema.TypeResolver;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
-import io.jenkins.plugins.io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
+import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
 import org.kohsuke.stapler.export.Model;

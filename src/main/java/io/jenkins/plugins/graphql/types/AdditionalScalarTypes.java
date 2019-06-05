@@ -1,11 +1,11 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql.types;
+package io.jenkins.plugins.graphql.types;
 
 import graphql.schema.Coercing;
 import graphql.schema.CoercingParseLiteralException;
 import graphql.schema.CoercingParseValueException;
 import graphql.schema.CoercingSerializeException;
 import graphql.schema.GraphQLScalarType;
-import io.jenkins.plugins.io.jenkins.plugins.graphql.types.scalars.GregrianCalendarScalar;
+import io.jenkins.plugins.graphql.types.scalars.GregrianCalendarScalar;
 
 public class AdditionalScalarTypes {
     private AdditionalScalarTypes() { }

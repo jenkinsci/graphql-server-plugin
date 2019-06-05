@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql.filters;
+package io.jenkins.plugins.graphql.filters;
 
 import hudson.Extension;
 

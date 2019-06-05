@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql.utils;
+package io.jenkins.plugins.graphql.utils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

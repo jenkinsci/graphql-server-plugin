@@ -1,6 +1,5 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.graphql;
 
-import io.jenkins.plugins.io.jenkins.plugins.graphql.utils.Memoizer;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.reflections.Reflections;
 import org.reflections.scanners.ResourcesScanner;
@@ -12,10 +11,7 @@ import org.reflections.util.FilterBuilder;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 public class ClassUtils {
     static final String ENHANCER = "$MockitoMock$";

@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.graphql;
 
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
@@ -23,7 +23,6 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

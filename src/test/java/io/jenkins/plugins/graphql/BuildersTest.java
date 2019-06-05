@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.graphql;
 
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;

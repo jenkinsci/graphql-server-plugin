@@ -1,4 +1,4 @@
-package io.jenkins.plugins.io.jenkins.plugins.graphql;
+package io.jenkins.plugins.graphql;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
