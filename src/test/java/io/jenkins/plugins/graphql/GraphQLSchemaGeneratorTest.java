@@ -232,7 +232,7 @@ public class GraphQLSchemaGeneratorTest {
                     .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
                     .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_GitTagAction\", \"ofType\":{}}")
                     .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_util_BuildData\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
+                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
                     .toHashMap()
             },
             new Gson().fromJson(
