@@ -60,7 +60,6 @@ public class Builders {
             .build();
     }
 
-
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
     /*package*/ static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
@@ -155,7 +154,7 @@ public class Builders {
             // interfaces.add(clazz);
             graphQLTypes.put(clazz.getName(), fieldBuilder);
             graphQLTypes.put(
-                clazz.getPackage() + ".__" + clazz.getSimpleName(),
+                "__" + ClassUtils.getGraphQLClassName(clazz),
                 GraphQLObjectType.newObject()
                     .name("__" + ClassUtils.getGraphQLClassName(clazz))
                     .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
@@ -266,14 +265,14 @@ public class Builders {
                 public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                     Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
                     String name = ClassUtils.getGraphQLClassName(realClazz);
-                    LOGGER.info(name);
+                    LOGGER.info("Attempting to find: " + name);
                     if (env.getSchema().getObjectType(name) != null) {
                         return env.getSchema().getObjectType(name);
                     }
                     for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
-                        GraphQLObjectType objectType = env.getSchema().getObjectType(
-                            "__" + name
-                        );
+                        name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
+                        LOGGER.info("Attempting to find interface: " + name);
+                        GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                         if (objectType != null) {
                             return objectType;
                         }
