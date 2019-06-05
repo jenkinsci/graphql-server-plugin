@@ -226,11 +226,6 @@ public class GraphQLSchemaGeneratorTest {
             )
         );
 
-//        System.out.println(new Gson().toJson(new Gson().fromJson(
-//            new Gson().toJson(getSchemaType(executionResult, "__Action")),
-//            HashMap[].class
-//        )));
-
         assertArrayEquals(
             new HashMap[] {
                 SchemaTypeResponse.newSchemaTypeResponse()
