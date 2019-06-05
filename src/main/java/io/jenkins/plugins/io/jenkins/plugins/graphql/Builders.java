@@ -116,7 +116,6 @@ public class Builders {
 
     protected GraphQLOutputType createSchemaClassName(Class clazz) {
         assert(clazz != null);
-        assert(clazz.getSimpleName() != null);
 
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
@@ -173,7 +172,7 @@ public class Builders {
         Model<?> model = MODEL_BUILDER.get(clazz);
 
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());;
+        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
 
         ArrayList<Model<?>> queue = new ArrayList<>();
         queue.add(model);
@@ -186,7 +185,7 @@ public class Builders {
 
         for (Class<?> topLevelClazz : interfaces) {
             if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
-                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(topLevelClazz.getSimpleName()));
+                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(topLevelClazz)));
             }
         }
 
@@ -266,14 +265,14 @@ public class Builders {
                 @Override
                 public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                     Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-                    String name = realClazz.getSimpleName();
+                    String name = ClassUtils.getGraphQLClassName(realClazz);
                     LOGGER.info(name);
                     if (env.getSchema().getObjectType(name) != null) {
                         return env.getSchema().getObjectType(name);
                     }
                     for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
                         GraphQLObjectType objectType = env.getSchema().getObjectType(
-                            "__" + interfaceClazz.getSimpleName()
+                            "__" + name
                         );
                         if (objectType != null) {
                             return objectType;
@@ -319,7 +318,7 @@ public class Builders {
     private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
         return queryType.field(GraphQLFieldDefinition.newFieldDefinition()
             .name("all" + clazz.getSimpleName() + "s")
-            .type(GraphQLList.list(GraphQLTypeReference.typeRef(clazz.getSimpleName())))
+            .type(GraphQLList.list(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz))))
             .argument(GraphQLArgument.newArgument()
                 .name("offset")
                 .type(Scalars.GraphQLInt)
