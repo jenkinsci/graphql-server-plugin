@@ -55,7 +55,7 @@ public class Builders {
             .name("_class")
             .description("Class Name")
             .type(Scalars.GraphQLString)
-            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getSimpleName())
+            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getName())
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
     }

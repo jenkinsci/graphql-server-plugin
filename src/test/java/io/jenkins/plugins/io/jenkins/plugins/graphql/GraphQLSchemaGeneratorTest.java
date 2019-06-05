@@ -91,7 +91,7 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"hudson_model_FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins_model_RenameAction\"},{\"_class\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction\"}]}}"),
+            JSONObject.fromObject("{\"test\":{\"_class\":\"hudson.model.FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins.model.RenameAction\"},{\"_class\":\"com.cloudbees.plugins.credentials.ViewCredentialsAction\"}]}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }
