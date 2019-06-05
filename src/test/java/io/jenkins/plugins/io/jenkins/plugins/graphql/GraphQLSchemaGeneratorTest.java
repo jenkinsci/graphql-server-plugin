@@ -13,17 +13,10 @@ import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
-import hudson.Extension;
-import hudson.model.Action;
-import hudson.model.Cause;
-import hudson.model.CauseAction;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
-import hudson.model.Job;
 import hudson.model.Run;
-import jenkins.model.TransientActionFactory;
 import net.sf.json.JSONObject;
-import net.sf.json.JSONSerializer;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -34,8 +27,6 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 
@@ -64,7 +55,7 @@ public class GraphQLSchemaGeneratorTest {
         Run run = Mockito.mock(FreeStyleBuild.class);
         Mockito.when(run.getTimestamp()).thenReturn(c);
 
-        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("Run");
+        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_Run");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, run, graphqlRun, "timestamp");
 
         assertEquals(
@@ -96,11 +87,11 @@ public class GraphQLSchemaGeneratorTest {
     public void actions() throws IOException {
         FreeStyleProject freeStyleProject = j.createFreeStyleProject();
 
-        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("Job");
+        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("hudson_model_Job");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"FreeStyleProject\",\"actions\":[{\"_class\":\"RenameAction\"},{\"_class\":\"ViewCredentialsAction\"}]}}"),
+            JSONObject.fromObject("{\"test\":{\"_class\":\"hudson_model_FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins_model_RenameAction\"},{\"_class\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction\"}]}}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }

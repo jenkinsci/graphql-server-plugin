@@ -37,15 +37,15 @@ public class BuildersTest {
             graphQLObjectType.getDescription()
         );
         Assert.assertEquals(
-            "String",
+            "java_lang_String",
             graphQLObjectType.getFieldDefinition("string").getType().getName()
         );
         Assert.assertEquals(
-            "[String]",
+            "[java_lang_String]",
             graphQLObjectType.getFieldDefinition("arrayString").getType().toString()
         );
         Assert.assertEquals(
-            "[String]",
+            "[java_lang_String]",
             graphQLObjectType.getFieldDefinition("listString").getType().toString()
         );
     }
