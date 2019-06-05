@@ -24,7 +24,7 @@ query {
       _class
       actions {
         _class
-        ... on CauseAction {
+        ... on hudson_model_CauseAction {
           _class
           causes {
             _class
@@ -45,7 +45,9 @@ query {
       estimatedDuration
       executor {
         _class
-        currentExecutable
+        currentExecutable {
+          _class
+        }
         idle
         likelyStuck
         number
