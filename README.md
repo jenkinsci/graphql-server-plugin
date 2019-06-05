@@ -1,5 +1,4 @@
-Graphql Server Plugin
-=====================
+# Graphql Server Plugin
 
 A graphql implementation for jenkins.
 
@@ -7,10 +6,13 @@ A graphql implementation for jenkins.
 
 ## TODO
 
-[] Create whoami function to output who you are
+[ ] Create whoami function to output who you are
+[ ] Remove allFreestyleJobs, and just allow class to be passed into allJobs
+[ ] Remove hacked in security stuff entirely (mostly commented out atm)
+[ ] Add allBuildsForJobs?
+[ ] Add allTestsForJobs?
 
 ## "Feature Complete" query
-
 
 ```
 query {
