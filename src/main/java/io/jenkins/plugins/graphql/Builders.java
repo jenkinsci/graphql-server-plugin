@@ -240,7 +240,6 @@ public class Builders {
                 for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
                     if (clazz != topLevelClazz && topLevelClazz.isAssignableFrom(clazz)) {
                         classQueue.add(clazz);
-                        queryType = builAllQuery(queryType, clazz);
                     }
                 }
             }
@@ -328,6 +327,10 @@ public class Builders {
                 .type(Scalars.GraphQLInt)
                 .defaultValue(100)
             )
+            .argument(GraphQLArgument.newArgument()
+                .name("type")
+                .type(Scalars.GraphQLString)
+            )
             .dataFetcher(new DataFetcher<Object>() {
                 public Iterator<?> slice(Iterable<?> base, int start, int limit) {
                     return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
@@ -335,24 +338,25 @@ public class Builders {
 
                 @Override
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
+                    Class _clazz = clazz;
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
+                    String clazzName = dataFetchingEnvironment.<String>getArgument("type");
 
+                    if (clazzName != null && !clazzName.isEmpty()) {
+                        _clazz = Class.forName(clazzName);
+                    }
 
-                    if (clazz == User.class) {
+                    if (_clazz == User.class) {
                         return Lists.newArrayList(slice(User.getAll(), offset, limit));
                     }
 
                     Iterable<?> items = Items.allItems(
                         Jenkins.getAuthentication(),
                         Jenkins.getInstanceOrNull(),
-                        clazz
+                        _clazz
                     );
-                    return Lists.newArrayList(slice(
-                        items,
-                        offset,
-                        limit
-                    ));
+                    return Lists.newArrayList(slice(items, offset, limit));
                 }
             })
         );
