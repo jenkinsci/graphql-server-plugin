@@ -85,20 +85,7 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
 
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
         LOGGER.info("Body: " + body);
-
-        String id = req.getHeader("Authorization");
-        if (id != null && !id.isEmpty()) {
-            // FIXME - security is currently Bearer <username>
-            context.put("user", User.get(id.replace("Bearer ", ""), false, Collections.emptyMap()));
-        }
-        if (!context.containsKey("user") || context.get("user") == null) {
-            context.put("user", User.current());
-        }
-
-        if (!context.containsKey("user") || context.get("user") == null) {
-            context.put("user", User.get("anonymous", false, Collections.emptyMap()));
-        }
-
+        
         if ("application/graphql".equals(req.getContentType())) {
             query = body;
         } else if (parameterMap.size() > 0) {

@@ -6,7 +6,7 @@ A graphql implementation for jenkins.
 
 ## TODO
 
-[ ] Remove hacked in security stuff entirely (mostly commented out atm)
+[X] Remove hacked in security stuff entirely (mostly commented out atm)
 [ ] Abstract classes should be handled the same as interfaces
 [ ] Create whoami function to output who you are
 [ ] Remove allFreestyleJobs, and just allow class to be passed into allJobs
