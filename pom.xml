@@ -15,7 +15,7 @@
         <java.level>8</java.level>
         <powermock.version>2.0.2</powermock.version>
     </properties>
-    <name>GraphQL Server</name>
+    <name>GraphQL API Server</name>
     <description>A GraphQL implementation of the Jenkins API</description>
     <licenses>
         <license>
