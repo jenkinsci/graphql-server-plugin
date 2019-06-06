@@ -121,16 +121,16 @@ public class Builders {
         }
 
         // interfaces are never exported, so handle them seperately
-        if (!Modifier.isInterface(clazz.getModifiers())) {
+        if (Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
+            if (!interfaces.contains(clazz)) {
+                interfaces.add(clazz);
+                classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
+            }
+        } else {
             try {
                 MODEL_BUILDER.get(clazz);
             } catch (org.kohsuke.stapler.export.NotExportableException e) {
                 return Scalars.GraphQLString;
-            }
-        } else {
-            if (!interfaces.contains(clazz)) {
-                interfaces.add(clazz);
-                classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
             }
         }
         classQueue.add(clazz);

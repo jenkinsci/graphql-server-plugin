@@ -85,7 +85,7 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
 
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
         LOGGER.info("Body: " + body);
-        
+
         if ("application/graphql".equals(req.getContentType())) {
             query = body;
         } else if (parameterMap.size() > 0) {

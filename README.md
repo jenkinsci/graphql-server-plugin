@@ -7,7 +7,7 @@ A graphql implementation for jenkins.
 ## TODO
 
 [X] Remove hacked in security stuff entirely (mostly commented out atm)
-[ ] Abstract classes should be handled the same as interfaces
+[X] Abstract classes should be handled the same as interfaces
 [ ] Create whoami function to output who you are
 [ ] Remove allFreestyleJobs, and just allow class to be passed into allJobs
 [ ] Add allBuildsForJobs?
@@ -28,10 +28,13 @@ query {
       actions {
         _class
         ... on hudson_model_CauseAction {
-          _class
           causes {
             _class
             shortDescription
+            ... on hudson_model_Cause_UserIdCause {
+              userId
+              userName
+            }
           }
         }
       }

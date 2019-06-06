@@ -32,6 +32,7 @@ import java.util.HashMap;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class GraphQLSchemaGeneratorTest {
     @Rule
@@ -270,7 +271,7 @@ public class GraphQLSchemaGeneratorTest {
                         "        \"name\": \"hudson_model_Action\",\n" +
                         "        \"ofType\": {}\n" +
                         "      }\n")
-                    .fields("{\"name\":\"causes\",\"description\":{},\"args\":[],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"OBJECT\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
+                    .fields("{\"name\":\"causes\",\"description\":{},\"args\":[],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
                     .toHashMap()
             },
             new Gson().fromJson(
@@ -278,6 +279,28 @@ public class GraphQLSchemaGeneratorTest {
                 HashMap[].class
             )
         );
+
+        assertArrayEquals(
+            new HashMap[] {
+                SchemaTypeResponse.newSchemaTypeResponse()
+                    .name("hudson_model_Cause_UserIdCause")
+                    .kind("OBJECT")
+                    .interfaces("{\n" +
+                        "        \"kind\": \"INTERFACE\",\n" +
+                        "        \"name\": \"hudson_model_Cause\",\n" +
+                        "        \"ofType\": {}\n" +
+                        "      }\n")
+                    .fields("{\"name\":\"shortDescription\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                    .fields("{\"name\":\"userId\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                    .fields("{\"name\":\"userName\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                    .toHashMap()
+            },
+            new Gson().fromJson(
+                new Gson().toJson(getSchemaType(executionResult, "hudson_model_Cause_UserIdCause")),
+                HashMap[].class
+            )
+        );
+        assertTrue(true);
     }
 
     private Object[] getSchemaType(ExecutionResult executionResult, String typeName) {
