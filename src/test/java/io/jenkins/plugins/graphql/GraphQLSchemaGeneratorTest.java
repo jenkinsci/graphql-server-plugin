@@ -56,7 +56,7 @@ public class GraphQLSchemaGeneratorTest {
         Run run = Mockito.mock(FreeStyleBuild.class);
         Mockito.when(run.getTimestamp()).thenReturn(c);
 
-        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_Run");
+        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("hudson_model_Run");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, run, graphqlRun, "timestamp");
 
         assertEquals(
