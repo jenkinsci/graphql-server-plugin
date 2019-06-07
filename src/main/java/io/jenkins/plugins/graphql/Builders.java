@@ -26,6 +26,7 @@ import hudson.model.User;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
+import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
@@ -40,8 +41,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -107,6 +112,13 @@ public class Builders {
 
     }
 
+    // Utility function to find distinct by class field
+    public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor)
+    {
+        Map<Object, Boolean> map = new ConcurrentHashMap<>();
+        return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
+    }
+
     /*** DONE STATIC */
     private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
     private HashSet<Class> interfaces = new HashSet(INTERFACES);
@@ -145,13 +157,15 @@ public class Builders {
         if (graphQLTypes.containsKey(clazz.getName())) {
             return;
         }
+        if (shouldIgnoreClass(clazz)) return;
+
         Model<?> model;
         try {
             model = MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
             GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
             fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
-            // interfaces.add(clazz);
+            interfaces.add(clazz);
             graphQLTypes.put(clazz.getName(), fieldBuilder);
             graphQLTypes.put(
                 "__" + ClassUtils.getGraphQLClassName(clazz),
@@ -162,12 +176,24 @@ public class Builders {
                     .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
+            graphQLTypes.put(clazz.getName(), fieldBuilder);
             return;
         }
         graphQLTypes.put(clazz.getName(), buildGraphQLTypeFromModel(clazz));
     }
 
+    protected boolean shouldIgnoreClass(Class clazz) {
+        if (clazz.isAnnotationPresent(NoExternalUse.class)) {
+            return true;
+        }
+        if (clazz.isAnonymousClass()) {
+            return true;
+        }
+        return false;
+    }
+
     protected GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
+
         Model<?> model = MODEL_BUILDER.get(clazz);
 
         GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
@@ -268,6 +294,7 @@ public class Builders {
                 .values()
                 .stream()
                 .map(GraphQLObjectType.Builder::build)
+                .filter(distinctByKey(GraphQLObjectType::getName))
                 .collect(Collectors.toList())
         );
 

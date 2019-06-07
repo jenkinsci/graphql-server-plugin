@@ -237,7 +237,6 @@ public class GraphQLSchemaGeneratorTest {
                 .name("hudson_model_Action")
                 .kind("INTERFACE")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsSelectHelper_WrappedCredentialsStore\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsStoreAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_SystemCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_UserCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
