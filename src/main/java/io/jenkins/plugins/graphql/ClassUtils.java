@@ -64,19 +64,10 @@ public class ClassUtils {
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
         classLoadersList.add(ClasspathHelper.staticClassLoader());
-        if (Jenkins.getInstanceOrNull() != null) {
-            System.out.println("GAVIN3");
-            classLoadersList.add(Jenkins.getInstanceOrNull().getPluginManager().uberClassLoader);
-        }
-        System.out.println("GAVIN2");
+//        if (Jenkins.getInstanceOrNull() != null) {
+//            classLoadersList.add(Jenkins.getInstanceOrNull().getPluginManager().uberClassLoader);
+//        }
 
-        System.out.println(
-            ClasspathHelper.forClassLoader(
-                classLoadersList.toArray(
-                    new ClassLoader[0]
-                )
-            )
-        );
         Reflections reflections = new Reflections(new ConfigurationBuilder()
             .setScanners(
                 new SubTypesScanner(
@@ -104,8 +95,6 @@ public class ClassUtils {
         );
 
         _getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
-        System.out.println("GAVIN");
-        System.out.println(_getAllClassesCache);
         return _getAllClassesCache;
     }
 
