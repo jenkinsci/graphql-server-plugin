@@ -1,7 +1,7 @@
 package io.jenkins.plugins.graphql;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.kohsuke.stapler.export.ModelBuilder;
-import jenkins.model.Jenkins;
 import org.reflections8.Reflections;
 import org.reflections8.scanners.ResourcesScanner;
 import org.reflections8.scanners.SubTypesScanner;
@@ -56,7 +56,9 @@ public class ClassUtils {
         return name;
     }
 
-    private static Set<Class<?>> _getAllClassesCache = null;
+    @VisibleForTesting
+    public static Set<Class<?>> _getAllClassesCache = null;
+
     private static Set<Class<?>> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
         _getAllClassesCache = new HashSet<>();

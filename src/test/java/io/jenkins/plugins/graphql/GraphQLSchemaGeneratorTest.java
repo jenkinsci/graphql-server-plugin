@@ -65,27 +65,16 @@ public class GraphQLSchemaGeneratorTest {
 
     @Before
     public void setup() {
+
+        ClassUtils._getAllClassesCache = MockClassUtils.mock_getAllClassesList();
+
         builder = new Builders();
-        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class, FreeStyleBuild.class));
-        builder.buildSchemaFromClass(FakeRun.class);
-        builder.buildSchemaFromClass(Action.class);
-        builder.buildSchemaFromClass(CredentialsSelectHelper.WrappedCredentialsStore.class);
-        builder.buildSchemaFromClass(CredentialsStoreAction.class);
-        builder.buildSchemaFromClass(SystemCredentialsProvider.UserFacingAction.class);
-        builder.buildSchemaFromClass(ViewCredentialsAction.class);
-        builder.buildSchemaFromClass(ViewCredentialsAction.RootActionImpl.class);
-        builder.buildSchemaFromClass(CauseAction.class);
-        builder.buildSchemaFromClass(MyViewsProperty.class);
-        builder.buildSchemaFromClass(ParametersAction.class);
-        builder.buildSchemaFromClass(ParametersDefinitionProperty.class);
-        builder.buildSchemaFromClass(GitTagAction.class);
-        builder.buildSchemaFromClass(BuildData.class);
-        builder.buildSchemaFromClass(GraphQLRootAction.class);
+        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
         graphQLSchema = builder.buildSchema();
     }
 
     @Test
-    public void timestampAsRFC() throws IOException {
+    public void timestampAsRFC() {
         GregorianCalendar c = new GregorianCalendar();
         c.setTimeInMillis(1559344577604L);
 
@@ -237,17 +226,10 @@ public class GraphQLSchemaGeneratorTest {
                 .name("hudson_model_Action")
                 .kind("INTERFACE")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsStoreAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_SystemCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_UserCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction_RootActionImpl\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_GitTagAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_util_BuildData\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
                 .toHashMap(),
             new Gson().fromJson(
