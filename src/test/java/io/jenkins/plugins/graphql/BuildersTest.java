@@ -50,4 +50,11 @@ public class BuildersTest {
         );
     }
 
+    @Test
+    public void confirmShouldIgnore() {
+        Assert.assertFalse(Builders.shouldIgnoreClass(hudson.model.Cause.class));
+        Assert.assertFalse(Builders.shouldIgnoreClass(hudson.model.Cause.UserIdCause.class));
+        Assert.assertFalse(Builders.shouldIgnoreClass(hudson.model.CauseAction.class));
+    }
+
 }

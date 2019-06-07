@@ -8,6 +8,7 @@ import org.reflections8.scanners.SubTypesScanner;
 import org.reflections8.util.ClasspathHelper;
 import org.reflections8.util.ConfigurationBuilder;
 import org.reflections8.util.FilterBuilder;
+import java.util.logging.Logger;
 
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 public class ClassUtils {
+    private static final Logger LOGGER = Logger.getLogger(ClassUtils.class.getName());
     static final String ENHANCER = "$MockitoMock$";
 
     // FIXME - memoize
@@ -76,9 +78,10 @@ public class ClassUtils {
                     false /* don't exclude Object.class */
                 ).filterResultsBy(i -> {
                     try {
-                        return Class.forName(i).isAnonymousClass();
+                        return !Builders.shouldIgnoreClass(Class.forName(i));
                     } catch (ClassNotFoundException e) {
-                        return true;
+                        LOGGER.warning("Found a class that isn't loadable: " + i + ":" + e.toString());
+                        return false;
                     }
                 })
             )

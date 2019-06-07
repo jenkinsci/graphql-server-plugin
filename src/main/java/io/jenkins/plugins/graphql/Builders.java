@@ -182,7 +182,7 @@ public class Builders {
         graphQLTypes.put(clazz.getName(), buildGraphQLTypeFromModel(clazz));
     }
 
-    protected boolean shouldIgnoreClass(Class clazz) {
+    public static boolean shouldIgnoreClass(Class clazz) {
         if (clazz.isAnnotationPresent(NoExternalUse.class)) {
             return true;
         }
