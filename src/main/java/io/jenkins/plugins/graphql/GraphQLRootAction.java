@@ -56,13 +56,15 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
 
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() {
-        Builders b = new Builders();
-        b.addExtraTopLevelClasses(
-            DescriptorExtensionList.lookup(TopLevelItemDescriptor.class).stream()
-                .map(d -> d.clazz)
-                .collect(Collectors.toList())
-        );
-        builtSchema = GraphQL.newGraphQL(b.buildSchema()).build();
+        if (!hudson.Main.isUnitTest) {
+            Builders b = new Builders();
+            b.addExtraTopLevelClasses(
+                DescriptorExtensionList.lookup(TopLevelItemDescriptor.class).stream()
+                    .map(d -> d.clazz)
+                    .collect(Collectors.toList())
+            );
+            builtSchema = GraphQL.newGraphQL(b.buildSchema()).build();
+        }
     }
 
     public static String optString(JSONObject json, String key, String defaultValue)

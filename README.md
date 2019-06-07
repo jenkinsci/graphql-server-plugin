@@ -10,6 +10,8 @@ A graphql implementation for jenkins.
 [X] Abstract classes should be handled the same as interfaces
 [ ] Create whoami function to output who you are
 [X] Remove allFreestyleJobs, and just allow class to be passed into allJobs
+[ ] Add "id" argument to allQueryTypes
+[ ] Add "id" argument to list[] fields?
 [ ] Add allBuildsForJobs?
 [ ] Add allTestsForJobs?
 

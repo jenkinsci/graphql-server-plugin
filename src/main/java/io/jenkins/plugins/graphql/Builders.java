@@ -182,12 +182,6 @@ public class Builders {
             superModel = superModel.superModel;
         }
 
-        for (Class<?> topLevelClazz : interfaces) {
-            if (topLevelClazz != clazz && topLevelClazz.isAssignableFrom(clazz)) {
-                fieldBuilder.withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(topLevelClazz)));
-            }
-        }
-
         for (Model<?> _model : queue) {
             for (Property p : _model.getProperties()) {
                 if (fieldBuilder.hasField(p.name)) {
@@ -236,13 +230,7 @@ public class Builders {
         }
 
         for (Class clazz : this.extraTopLevelClasses) {
-            if (!Modifier.isAbstract(clazz.getModifiers())) {
-                for (Class topLevelClazz : TOP_LEVEL_CLASSES) {
-                    if (clazz != topLevelClazz && topLevelClazz.isAssignableFrom(clazz)) {
-                        classQueue.add(clazz);
-                    }
-                }
-            }
+            classQueue.add(clazz);
         }
 
         while (!classQueue.isEmpty()) {
@@ -255,30 +243,24 @@ public class Builders {
         HashSet<GraphQLType> types = new HashSet<>();
         GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
+        for (Class<?> interfaceClazz : interfaces) {
+            for (String instanceClazzStr : this.graphQLTypes.keySet()) {
+                try {
+                    Class<?> instanceClazz = Class.forName(instanceClazzStr);
+                    if (interfaceClazz != instanceClazz && interfaceClazz.isAssignableFrom(instanceClazz)) {
+                        this.graphQLTypes.get(instanceClazzStr).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
+                    }
+                } catch (ClassNotFoundException e) {
+                    continue;
+                }
+            }
+        }
+
         for (Class clazz : interfaces) {
             GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz.getName()).build());
             types.add(interfaceType);
             LOGGER.info("Interface:" + interfaceType.getName());
-            codeRegistry.typeResolver(interfaceType.getName(), new TypeResolver() {
-                @Override
-                public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                    Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-                    String name = ClassUtils.getGraphQLClassName(realClazz);
-                    LOGGER.info("Attempting to find: " + name);
-                    if (env.getSchema().getObjectType(name) != null) {
-                        return env.getSchema().getObjectType(name);
-                    }
-                    for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
-                        name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
-                        LOGGER.info("Attempting to find interface: " + name);
-                        GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                        if (objectType != null) {
-                            return objectType;
-                        }
-                    }
-                    return null;
-                }
-            });
+            codeRegistry.typeResolver(interfaceType.getName(), buildTypeResolver());
         }
 
         types.addAll(
@@ -298,6 +280,29 @@ public class Builders {
             .additionalType(ExtendedScalars.DateTime)
             .additionalType(AdditionalScalarTypes.gregrianCalendarScalar)
             .build();
+    }
+
+    private TypeResolver buildTypeResolver() {
+        return new TypeResolver() {
+            @Override
+            public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+                Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
+                String name = ClassUtils.getGraphQLClassName(realClazz);
+                LOGGER.info("Attempting to find: " + name);
+                if (env.getSchema().getObjectType(name) != null) {
+                    return env.getSchema().getObjectType(name);
+                }
+                for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
+                    name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
+                    LOGGER.info("Attempting to find interface: " + name);
+                    GraphQLObjectType objectType = env.getSchema().getObjectType(name);
+                    if (objectType != null) {
+                        return objectType;
+                    }
+                }
+                return null;
+            }
+        };
     }
 
     private GraphQLInterfaceType convertToInterface(GraphQLObjectType objectType) {

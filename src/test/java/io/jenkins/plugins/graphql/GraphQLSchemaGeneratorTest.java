@@ -1,5 +1,9 @@
 package io.jenkins.plugins.graphql;
 
+import com.cloudbees.plugins.credentials.CredentialsSelectHelper;
+import com.cloudbees.plugins.credentials.CredentialsStoreAction;
+import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
+import com.cloudbees.plugins.credentials.ViewCredentialsAction;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
@@ -13,20 +17,31 @@ import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
+import hudson.model.Action;
+import hudson.model.CauseAction;
 import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
+import hudson.model.Job;
+import hudson.model.MyViewsProperty;
+import hudson.model.ParametersAction;
+import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
+import hudson.plugins.git.GitTagAction;
+import hudson.plugins.git.util.BuildData;
 import net.sf.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.WithoutJenkins;
+import org.kohsuke.stapler.export.ExportedBean;
 import org.mockito.Mockito;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 
@@ -41,10 +56,31 @@ public class GraphQLSchemaGeneratorTest {
     private Builders builder;
     private GraphQLSchema graphQLSchema;
 
+    @ExportedBean
+    public class FakeRun extends Run {
+        protected FakeRun(@Nonnull Job job, @Nonnull Calendar timestamp) {
+            super(job, timestamp);
+        }
+    }
+
     @Before
     public void setup() {
         builder = new Builders();
-        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
+        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class, FreeStyleBuild.class));
+        builder.buildSchemaFromClass(FakeRun.class);
+        builder.buildSchemaFromClass(Action.class);
+        builder.buildSchemaFromClass(CredentialsSelectHelper.WrappedCredentialsStore.class);
+        builder.buildSchemaFromClass(CredentialsStoreAction.class);
+        builder.buildSchemaFromClass(SystemCredentialsProvider.UserFacingAction.class);
+        builder.buildSchemaFromClass(ViewCredentialsAction.class);
+        builder.buildSchemaFromClass(ViewCredentialsAction.RootActionImpl.class);
+        builder.buildSchemaFromClass(CauseAction.class);
+        builder.buildSchemaFromClass(MyViewsProperty.class);
+        builder.buildSchemaFromClass(ParametersAction.class);
+        builder.buildSchemaFromClass(ParametersDefinitionProperty.class);
+        builder.buildSchemaFromClass(GitTagAction.class);
+        builder.buildSchemaFromClass(BuildData.class);
+        builder.buildSchemaFromClass(GraphQLRootAction.class);
         graphQLSchema = builder.buildSchema();
     }
 
@@ -53,10 +89,10 @@ public class GraphQLSchemaGeneratorTest {
         GregorianCalendar c = new GregorianCalendar();
         c.setTimeInMillis(1559344577604L);
 
-        Run run = Mockito.mock(FreeStyleBuild.class);
+        FakeRun run = Mockito.mock(FakeRun.class);
         Mockito.when(run.getTimestamp()).thenReturn(c);
 
-        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("hudson_model_Run");
+        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("io_jenkins_plugins_graphql_GraphQLSchemaGeneratorTest_FakeRun");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, run, graphqlRun, "timestamp");
 
         assertEquals(
@@ -64,25 +100,6 @@ public class GraphQLSchemaGeneratorTest {
             JSONObject.fromObject(executeResult.getData())
         );
     }
-
-//    @SuppressWarnings("rawtypes")
-//    @Extension
-//    public static class FakeCauseAction extends TransientActionFactory<Job> {
-//        @Override
-//        public Class<Job> type() {
-//            return Job.class;
-//        }
-//
-//        @Override
-//        public Collection<? extends Action> createFor(Job j) {
-//            return Collections.singleton(new CauseAction(new Cause() {
-//                @Override
-//                public String getShortDescription() {
-//                    return "My Cause";
-//                }
-//            }));
-//        }
-//    }
 
     @Test
     public void actions() throws IOException {
@@ -194,7 +211,7 @@ public class GraphQLSchemaGeneratorTest {
             this.data.put("interfaces", interfaces);
             return this;
         }
-        
+
         public SchemaTypeResponse fields(String json) {
             ArrayList<Object> fields = new ArrayList<>();
             if (this.data.get("fields") instanceof ArrayList) {
@@ -207,105 +224,97 @@ public class GraphQLSchemaGeneratorTest {
     }
 
     @Test
-    @WithoutJenkins
     public void generateSchemaString() throws IOException {
         Builders builder = new Builders();
         GraphQLSchema graphQLSchema = builder.buildSchema();
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput().query(getIntrospectionQuery()).build();
         ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+        System.out.println(graphQLSchema.getTypeMap().keySet());
 
-        assertArrayEquals(
-            new HashMap[] {
-                SchemaTypeResponse.newSchemaTypeResponse()
-                    .name("hudson_model_Action")
-                    .kind("INTERFACE")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsSelectHelper_WrappedCredentialsStore\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsStoreAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_SystemCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_UserCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction_RootActionImpl\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_GitTagAction\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_util_BuildData\", \"ofType\":{}}")
-                    .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
-                    .toHashMap()
-            },
+        assertEquals(
+            SchemaTypeResponse.newSchemaTypeResponse()
+                .name("hudson_model_Action")
+                .kind("INTERFACE")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsSelectHelper_WrappedCredentialsStore\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_CredentialsStoreAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_SystemCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_UserCredentialsProvider_UserFacingAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"com_cloudbees_plugins_credentials_ViewCredentialsAction_RootActionImpl\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_GitTagAction\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_plugins_git_util_BuildData\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
+                .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "hudson_model_Action")),
-                HashMap[].class
+                HashMap.class
             )
         );
 
-        assertArrayEquals(
-            new HashMap[] {
-                SchemaTypeResponse.newSchemaTypeResponse()
-                    .name("__hudson_model_Action")
-                    .description("Generic implementation of Action with just _class defined")
-                    .kind("OBJECT")
-                    .interfaces("{\n" +
-                        "        \"kind\": \"INTERFACE\",\n" +
-                        "        \"name\": \"hudson_model_Action\",\n" +
-                        "        \"ofType\": {}\n" +
-                        "      }\n")
-                    .toHashMap()
-            },
+        assertEquals(
+            SchemaTypeResponse.newSchemaTypeResponse()
+                .name("__hudson_model_Action")
+                .description("Generic implementation of Action with just _class defined")
+                .kind("OBJECT")
+                .interfaces("{\n" +
+                    "        \"kind\": \"INTERFACE\",\n" +
+                    "        \"name\": \"hudson_model_Action\",\n" +
+                    "        \"ofType\": {}\n" +
+                    "      }\n")
+                .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "__hudson_model_Action")),
-                HashMap[].class
+                HashMap.class
             )
         );
 
-        assertArrayEquals(
-            new HashMap[] {
-                SchemaTypeResponse.newSchemaTypeResponse()
-                    .name("hudson_model_CauseAction")
-                    .kind("OBJECT")
-                    .interfaces("{\n" +
-                        "        \"kind\": \"INTERFACE\",\n" +
-                        "        \"name\": \"hudson_model_Action\",\n" +
-                        "        \"ofType\": {}\n" +
-                        "      }\n")
-                    .fields("{\"name\":\"causes\",\"description\":{},\"args\":[],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
-                    .toHashMap()
-            },
+        assertEquals(
+            SchemaTypeResponse.newSchemaTypeResponse()
+                .name("hudson_model_CauseAction")
+                .kind("OBJECT")
+                .interfaces("{\n" +
+                    "        \"kind\": \"INTERFACE\",\n" +
+                    "        \"name\": \"hudson_model_Action\",\n" +
+                    "        \"ofType\": {}\n" +
+                    "      }\n")
+                .fields("{\"name\":\"causes\",\"description\":{},\"args\":[],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
+                .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "hudson_model_CauseAction")),
-                HashMap[].class
+                HashMap.class
             )
         );
 
-        assertArrayEquals(
-            new HashMap[] {
-                SchemaTypeResponse.newSchemaTypeResponse()
-                    .name("hudson_model_Cause_UserIdCause")
-                    .kind("OBJECT")
-                    .interfaces("{\n" +
-                        "        \"kind\": \"INTERFACE\",\n" +
-                        "        \"name\": \"hudson_model_Cause\",\n" +
-                        "        \"ofType\": {}\n" +
-                        "      }\n")
-                    .fields("{\"name\":\"shortDescription\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
-                    .fields("{\"name\":\"userId\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
-                    .fields("{\"name\":\"userName\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
-                    .toHashMap()
-            },
+        assertEquals(
+            SchemaTypeResponse.newSchemaTypeResponse()
+                .name("hudson_model_Cause_UserIdCause")
+                .kind("OBJECT")
+                .interfaces("{\n" +
+                    "        \"kind\": \"INTERFACE\",\n" +
+                    "        \"name\": \"hudson_model_Cause\",\n" +
+                    "        \"ofType\": {}\n" +
+                    "      }\n")
+                .fields("{\"name\":\"shortDescription\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                .fields("{\"name\":\"userId\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                .fields("{\"name\":\"userName\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "hudson_model_Cause_UserIdCause")),
-                HashMap[].class
+                HashMap.class
             )
         );
         assertTrue(true);
     }
 
-    private Object[] getSchemaType(ExecutionResult executionResult, String typeName) {
+    private Object getSchemaType(ExecutionResult executionResult, String typeName) {
         return JSONObject.fromObject(executionResult.getData()).getJSONObject("__schema").getJSONArray("types").stream().filter(
             type -> ((JSONObject) type).getString("name").equals(typeName)
-        ).toArray();
+        ).toArray()[0];
     }
 }

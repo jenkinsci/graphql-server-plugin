@@ -1,12 +1,13 @@
 package io.jenkins.plugins.graphql;
 
 import org.kohsuke.stapler.export.ModelBuilder;
-import org.reflections.Reflections;
-import org.reflections.scanners.ResourcesScanner;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
-import org.reflections.util.FilterBuilder;
+import jenkins.model.Jenkins;
+import org.reflections8.Reflections;
+import org.reflections8.scanners.ResourcesScanner;
+import org.reflections8.scanners.SubTypesScanner;
+import org.reflections8.util.ClasspathHelper;
+import org.reflections8.util.ConfigurationBuilder;
+import org.reflections8.util.FilterBuilder;
 
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -17,12 +18,12 @@ public class ClassUtils {
     static final String ENHANCER = "$MockitoMock$";
 
     // FIXME - memoize
-    public static Set<Class<?>> getAllInterfaces(Class instance) {
+    public static Set<Class<?>> getAllInterfaces(Class<?> instance) {
         Set<Class<?>> interfaces = new HashSet<>();
         if (instance == null) {
             return interfaces;
         }
-        for (Class interfaceClazz : instance.getInterfaces()) {
+        for (Class<?> interfaceClazz : instance.getInterfaces()) {
             interfaces.add(interfaceClazz);
             interfaces.addAll(getAllInterfaces(interfaceClazz));
         }
@@ -30,9 +31,8 @@ public class ClassUtils {
         return interfaces;
     }
 
-    // FIXME - memoize (maybe)
-    public static Class getRealClass(Class clazz) {
-        Class type = clazz;
+    public static Class<?> getRealClass(Class<?> clazz) {
+        Class<?> type = clazz;
         while(type.getSimpleName().contains(ClassUtils.ENHANCER)) {
             type = type.getSuperclass();
         }
@@ -40,7 +40,7 @@ public class ClassUtils {
     }
 
     // FIXME - memoize
-    public static String getGraphQLClassName(Class clazz) {
+    public static String getGraphQLClassName(Class<?> clazz) {
         clazz = getRealClass(clazz);
         String name = clazz.getName().replaceAll("\\$[0-9]+$", "");
 //        String name = clazz.getSimpleName();
@@ -56,15 +56,27 @@ public class ClassUtils {
         return name;
     }
 
-    private static Set<Class> _getAllClassesCache = null;
-    private static Set<Class> _getAllClasses() {
+    private static Set<Class<?>> _getAllClassesCache = null;
+    private static Set<Class<?>> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
         _getAllClassesCache = new HashSet<>();
 
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
         classLoadersList.add(ClasspathHelper.staticClassLoader());
+        if (Jenkins.getInstanceOrNull() != null) {
+            System.out.println("GAVIN3");
+            classLoadersList.add(Jenkins.getInstanceOrNull().getPluginManager().uberClassLoader);
+        }
+        System.out.println("GAVIN2");
 
+        System.out.println(
+            ClasspathHelper.forClassLoader(
+                classLoadersList.toArray(
+                    new ClassLoader[0]
+                )
+            )
+        );
         Reflections reflections = new Reflections(new ConfigurationBuilder()
             .setScanners(
                 new SubTypesScanner(
@@ -92,6 +104,8 @@ public class ClassUtils {
         );
 
         _getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
+        System.out.println("GAVIN");
+        System.out.println(_getAllClassesCache);
         return _getAllClassesCache;
     }
 
