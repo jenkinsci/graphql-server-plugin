@@ -74,8 +74,13 @@ public class ClassUtils {
             .setScanners(
                 new SubTypesScanner(
                     false /* don't exclude Object.class */
-                ),
-                new ResourcesScanner()
+                ).filterResultsBy(i -> {
+                    try {
+                        return Class.forName(i).isAnonymousClass();
+                    } catch (ClassNotFoundException e) {
+                        return true;
+                    }
+                })
             )
             .setUrls(
                 ClasspathHelper.forClassLoader(
