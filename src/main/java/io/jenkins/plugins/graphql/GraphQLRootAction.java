@@ -9,7 +9,6 @@ import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
 import hudson.model.TopLevelItemDescriptor;
-import hudson.model.User;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
@@ -23,7 +22,6 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -113,8 +111,6 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");
         rsp.setContentType("application/json");
         try {
-//            User user = (User) context.get("user");
-//            try (ACLContext ignored = ACL.as(user.impersonate())) {
             ExecutionInput executionInput = ExecutionInput
                 .newExecutionInput()
                 .query(query)

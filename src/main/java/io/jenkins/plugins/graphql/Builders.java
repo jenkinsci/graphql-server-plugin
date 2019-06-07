@@ -67,12 +67,12 @@ public class Builders {
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
-    /*package*/ static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
+    /*package*/ private static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
         Job.class,
         RunWithSCM.class
     ));
 
-    /*package*/ static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
+    /*package*/ private static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
         Job.class,
         User.class
     ));
@@ -106,21 +106,22 @@ public class Builders {
         javaTypesToGraphqlTypes.put("short", Scalars.GraphQLShort);
         javaTypesToGraphqlTypes.put(Short.class.getSimpleName(), Scalars.GraphQLShort);
 
-        javaTypesToGraphqlTypes.put("GregorianCalendar", AdditionalScalarTypes.gregrianCalendarScalar);
-        javaTypesToGraphqlTypes.put("Calendar", AdditionalScalarTypes.gregrianCalendarScalar);
-        javaTypesToGraphqlTypes.put("Date", AdditionalScalarTypes.gregrianCalendarScalar);
+        javaTypesToGraphqlTypes.put("GregorianCalendar", AdditionalScalarTypes.GregrianCalendarScalar);
+        javaTypesToGraphqlTypes.put("Calendar", AdditionalScalarTypes.GregrianCalendarScalar);
+        javaTypesToGraphqlTypes.put("Date", AdditionalScalarTypes.GregrianCalendarScalar);
 
     }
 
     // Utility function to find distinct by class field
-    public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor)
+    private static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor)
     {
         Map<Object, Boolean> map = new ConcurrentHashMap<>();
         return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
     }
 
     /*** DONE STATIC */
-    private HashMap<String, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashMap<String, GraphQLObjectType.Builder> mockGraphQLTypes = new HashMap();
     private HashSet<Class> interfaces = new HashSet(INTERFACES);
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
@@ -221,9 +222,6 @@ public class Builders {
                 } else if (propertyClazz.isArray()) {
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (propertyClazz.isInstance(Object[].class)) {
-                    System.out.println(p.name + ":" + model.type.toString());
-                    System.err.println(p.name + ":" + model.type.toString());
-
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (Collection.class.isAssignableFrom(propertyClazz)) {
                     className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));
@@ -255,9 +253,7 @@ public class Builders {
             queryType = builAllQuery(queryType, clazz);
         }
 
-        for (Class clazz : this.extraTopLevelClasses) {
-            classQueue.add(clazz);
-        }
+        classQueue.addAll(this.extraTopLevelClasses);
 
         while (!classQueue.isEmpty()) {
             Class clazz = classQueue.poll();
@@ -305,7 +301,7 @@ public class Builders {
             .codeRegistry(codeRegistry.build())
             .additionalTypes(types)
             .additionalType(ExtendedScalars.DateTime)
-            .additionalType(AdditionalScalarTypes.gregrianCalendarScalar)
+            .additionalType(AdditionalScalarTypes.GregrianCalendarScalar)
             .build();
     }
 
@@ -373,7 +369,7 @@ public class Builders {
                     Class _clazz = clazz;
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                    String clazzName = dataFetchingEnvironment.<String>getArgument("type");
+                    String clazzName = dataFetchingEnvironment.getArgument("type");
 
                     if (clazzName != null && !clazzName.isEmpty()) {
                         _clazz = Class.forName(clazzName);
