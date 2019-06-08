@@ -90,3 +90,7 @@ query {
   }
 }
 ```
+
+
+// FieldCoordinates coordinates = FieldCoordinates.coordinates(parentType, field);
+// environment.getCodeRegistry().dataFetcher(coordinates, dataFetcher);
