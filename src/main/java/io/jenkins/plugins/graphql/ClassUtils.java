@@ -1,6 +1,7 @@
 package io.jenkins.plugins.graphql;
 
 import com.google.common.annotations.VisibleForTesting;
+import jenkins.model.Jenkins;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.reflections8.Reflections;
 import org.reflections8.scanners.ResourcesScanner;
@@ -8,18 +9,21 @@ import org.reflections8.scanners.SubTypesScanner;
 import org.reflections8.util.ClasspathHelper;
 import org.reflections8.util.ConfigurationBuilder;
 import org.reflections8.util.FilterBuilder;
+
+import java.lang.reflect.Field;
+import java.util.Vector;
 import java.util.logging.Logger;
 
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ClassUtils {
     private static final Logger LOGGER = Logger.getLogger(ClassUtils.class.getName());
     static final String ENHANCER = "$MockitoMock$";
 
-    // FIXME - memoize
     public static Set<Class<?>> getAllInterfaces(Class<?> instance) {
         Set<Class<?>> interfaces = new HashSet<>();
         if (instance == null) {
@@ -32,6 +36,16 @@ public class ClassUtils {
         interfaces.addAll(getAllInterfaces(instance.getSuperclass()));
         return interfaces;
     }
+
+    public static Set<Class<?>> getAllSuperClasses(Class<?> instance) {
+        Set<Class<?>> superclasses = new HashSet<>();
+        while (instance.getSuperclass() != null) {
+            superclasses.add(instance.getSuperclass());
+            instance = instance.getSuperclass();
+        }
+        return superclasses;
+    }
+
 
     public static Class<?> getRealClass(Class<?> clazz) {
         Class<?> type = clazz;
@@ -68,22 +82,36 @@ public class ClassUtils {
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
         classLoadersList.add(ClasspathHelper.staticClassLoader());
-//        if (Jenkins.getInstanceOrNull() != null) {
-//            classLoadersList.add(Jenkins.getInstanceOrNull().getPluginManager().uberClassLoader);
-//        }
+        if (Jenkins.getInstanceOrNull() != null) {
+            classLoadersList.addAll(
+                Jenkins.getInstanceOrNull().getPluginManager().getPlugins().stream()
+                    .map(i -> i.classLoader).collect(Collectors.toList())
+            );
+        }
+
+        try {
+            final Field f = ClassLoader.class.getDeclaredField("classes");
+            boolean oldAccessible = f.isAccessible();
+            f.setAccessible(true);
+            for (ClassLoader classLoader : classLoadersList) {
+                Vector<Class> classes =  (Vector<Class>) f.get(classLoader);
+                for (Class clazz : classes) {
+                    if (clazz.getName().toLowerCase().contains("jenkins") || clazz.getName().toLowerCase().contains("hudson")) {
+                        _getAllClassesCache.add(clazz);
+                    }
+                }
+            }
+            f.setAccessible(oldAccessible);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            LOGGER.info("Unable to use classloader, so falling back to reflections: " + e.getMessage());
+        }
 
         Reflections reflections = new Reflections(new ConfigurationBuilder()
             .setScanners(
                 new SubTypesScanner(
                     false /* don't exclude Object.class */
-                ).filterResultsBy(i -> {
-                    try {
-                        return !Builders.shouldIgnoreClass(Class.forName(i));
-                    } catch (ClassNotFoundException e) {
-                        LOGGER.warning("Found a class that isn't loadable: " + i + ":" + e.toString());
-                        return false;
-                    }
-                })
+                ),
+                new ResourcesScanner()
             )
             .setUrls(
                 ClasspathHelper.forClassLoader(
@@ -94,17 +122,24 @@ public class ClassUtils {
             )
             .filterInputsBy(
                 new FilterBuilder()
+                    .includePackage("com.cloudbees")
                     .includePackage("hudson.model")
-                    .includePackage("org.jenkinsci")
                     .includePackage("hudson.plugins")
                     .includePackage("io.jenkins")
                     .includePackage("jenkins.plugins")
-                    .includePackage("com.cloudbees")
                     .includePackage("org.jenkins")
+                    .includePackage("org.jenkinsci")
+                    .includePackage("org.jenkinsci.plugins.workflow.job")
             )
         );
 
         _getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
+        LOGGER.info(
+            _getAllClassesCache.stream().filter(i -> i.getName().contains("WorkflowRun")).collect(Collectors.toList()).toString()
+        );
+        LOGGER.info(
+            _getAllClassesCache.stream().filter(i -> i.getName().contains("CauseAction")).collect(Collectors.toList()).toString()
+        );
         return _getAllClassesCache;
     }
 
