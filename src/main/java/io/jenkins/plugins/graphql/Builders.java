@@ -20,8 +20,10 @@ import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
+import hudson.model.Item;
 import hudson.model.Items;
 import hudson.model.Job;
+import hudson.model.ModelObject;
 import hudson.model.User;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
@@ -32,6 +34,8 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,21 +158,21 @@ public class Builders {
         return TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
     }
 
-    public void buildSchemaFromClass(Class clazz) {
-        if (graphQLTypes.containsKey(clazz.getName())) {
+    private void buildSchemaFromClass(Class clazz) {
+        if (graphQLTypes.containsKey(clazz)) {
             return;
         }
-        if (shouldIgnoreClass(clazz)) return;
+        if (shouldIgnoreClass(clazz)) {
+            return;
+        }
 
-        Model<?> model;
         try {
-            model = MODEL_BUILDER.get(clazz);
+            MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
             GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
             fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
             interfaces.add(clazz);
-            graphQLTypes.put(clazz.getName(), fieldBuilder);
-            graphQLTypes.put(
+            mockGraphQLTypes.put(
                 "__" + ClassUtils.getGraphQLClassName(clazz),
                 GraphQLObjectType.newObject()
                     .name("__" + ClassUtils.getGraphQLClassName(clazz))
@@ -177,10 +181,10 @@ public class Builders {
                     .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
-            graphQLTypes.put(clazz.getName(), fieldBuilder);
+            graphQLTypes.put(clazz, fieldBuilder);
             return;
         }
-        graphQLTypes.put(clazz.getName(), buildGraphQLTypeFromModel(clazz));
+        graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz));
     }
 
     public static boolean shouldIgnoreClass(Class clazz) {
@@ -216,12 +220,10 @@ public class Builders {
                 }
                 Class propertyClazz = p.getType();
 
-                GraphQLOutputType className = null;
+                GraphQLOutputType className;
                 if ("id".equals(p.name)) {
                     className = Scalars.GraphQLID;
                 } else if (propertyClazz.isArray()) {
-                    className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
-                } else if (propertyClazz.isInstance(Object[].class)) {
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (Collection.class.isAssignableFrom(propertyClazz)) {
                     className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));
@@ -245,14 +247,8 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        for (Class clazz : Stream.concat(interfaces.stream(), TOP_LEVEL_CLASSES.stream()).toArray(Class[]::new)) {
-            this.buildSchemaFromClass(clazz);
-        }
-
-        for (Class clazz : TOP_LEVEL_CLASSES) {
-            queryType = builAllQuery(queryType, clazz);
-        }
-
+        classQueue.addAll(this.TOP_LEVEL_CLASSES);
+        classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
         while (!classQueue.isEmpty()) {
@@ -265,36 +261,40 @@ public class Builders {
         HashSet<GraphQLType> types = new HashSet<>();
         GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
-        for (Class<?> interfaceClazz : interfaces) {
-            for (String instanceClazzStr : this.graphQLTypes.keySet()) {
-                try {
-                    Class<?> instanceClazz = Class.forName(instanceClazzStr);
-                    if (interfaceClazz != instanceClazz && interfaceClazz.isAssignableFrom(instanceClazz)) {
-                        this.graphQLTypes.get(instanceClazzStr).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
-                    }
-                } catch (ClassNotFoundException e) {
-                    continue;
-                }
-            }
-        }
-
         for (Class clazz : interfaces) {
-            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz.getName()).build());
+            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz).build());
             types.add(interfaceType);
             LOGGER.info("Interface:" + interfaceType.getName());
             codeRegistry.typeResolver(interfaceType.getName(), buildTypeResolver());
         }
 
+        for (Class<?> interfaceClazz : interfaces) {
+            for (Class<?> instanceClazz : this.graphQLTypes.keySet()) {
+                if (interfaceClazz != instanceClazz && interfaceClazz.isAssignableFrom(instanceClazz)) {
+                    this.graphQLTypes.get(instanceClazz).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
+                }
+            }
+        }
+
         types.addAll(
-            this.graphQLTypes
-                .values()
-                .stream()
+            Stream.concat(
+                this.mockGraphQLTypes.values().stream(),
+                this.graphQLTypes.values().stream()
+            )
                 .map(GraphQLObjectType.Builder::build)
                 .filter(distinctByKey(GraphQLObjectType::getName))
                 .collect(Collectors.toList())
         );
 
+        for (Class clazz : TOP_LEVEL_CLASSES) {
+            queryType = builAllQuery(queryType, clazz);
+        }
 
+        this.graphQLTypes = null;
+        this.mockGraphQLTypes = null;
+        this.interfaces = null;
+        this.classQueue = null;
+        this.extraTopLevelClasses = null;
 
         return GraphQLSchema.newSchema()
             .query(queryType.build())
@@ -315,11 +315,21 @@ public class Builders {
                 if (env.getSchema().getObjectType(name) != null) {
                     return env.getSchema().getObjectType(name);
                 }
+
+                List<GraphQLType> impls = env.getSchema().getTypeMap().values().stream().filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType())).collect(Collectors.toList());
+                for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
+                    name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
+                    LOGGER.info("Attempting to find subclass: " + name);
+                    GraphQLObjectType objectType = env.getSchema().getObjectType(name);
+                    if (objectType != null) {
+                        return objectType;
+                    }
+                }
                 for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
                     name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
                     LOGGER.info("Attempting to find interface: " + name);
                     GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                    if (objectType != null) {
+                    if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
                         return objectType;
                     }
                 }
@@ -341,7 +351,7 @@ public class Builders {
         return interfaceType.build();
     }
 
-    private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class clazz) {
+    private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class<ModelObject> clazz) {
         return queryType.field(GraphQLFieldDefinition.newFieldDefinition()
             .name("all" + clazz.getSimpleName() + "s")
             .type(GraphQLList.list(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz))))
@@ -359,6 +369,10 @@ public class Builders {
                 .name("type")
                 .type(Scalars.GraphQLString)
             )
+            .argument(GraphQLArgument.newArgument()
+                .name("ID")
+                .type(Scalars.GraphQLID)
+            )
             .dataFetcher(new DataFetcher<Object>() {
                 public Iterator<?> slice(Iterable<?> base, int start, int limit) {
                     return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
@@ -370,21 +384,33 @@ public class Builders {
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
                     String clazzName = dataFetchingEnvironment.getArgument("type");
+                    String id = dataFetchingEnvironment.getArgument("id");
 
                     if (clazzName != null && !clazzName.isEmpty()) {
                         _clazz = Class.forName(clazzName);
                     }
 
+                    Iterable iterable;
                     if (_clazz == User.class) {
-                        return Lists.newArrayList(slice(User.getAll(), offset, limit));
+                        iterable = User.getAll();
+                    } else {
+                        iterable = Items.allItems(
+                            Jenkins.getAuthentication(),
+                            Jenkins.getInstanceOrNull(),
+                            _clazz
+                        );
                     }
 
-                    Iterable<?> items = Items.allItems(
-                        Jenkins.getAuthentication(),
-                        Jenkins.getInstanceOrNull(),
-                        _clazz
-                    );
-                    return Lists.newArrayList(slice(items, offset, limit));
+                    if (id != null && !id.isEmpty()) {
+                        Method getIdMethod = _clazz.getMethod("getId");
+                        for (Object t : iterable) {
+                            if (getIdMethod.invoke(t).equals(id)) {
+                                return t;
+                            }
+                        }
+                    }
+
+                    return Lists.newArrayList(slice(iterable, offset, limit));
                 }
             })
         );
