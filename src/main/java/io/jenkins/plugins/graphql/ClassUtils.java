@@ -73,9 +73,9 @@ public class ClassUtils {
     }
 
     @VisibleForTesting
-    public static Set<Class<?>> _getAllClassesCache = null;
+    public static Set<Class> _getAllClassesCache = null;
 
-    private static Set<Class<?>> _getAllClasses() {
+    private static Set<Class> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
         _getAllClassesCache = new HashSet<>();
 
@@ -95,11 +95,12 @@ public class ClassUtils {
             f.setAccessible(true);
             for (ClassLoader classLoader : classLoadersList) {
                 Vector<Class> classes =  (Vector<Class>) f.get(classLoader);
-                for (Class clazz : classes) {
-                    if (clazz.getName().toLowerCase().contains("jenkins") || clazz.getName().toLowerCase().contains("hudson")) {
-                        _getAllClassesCache.add(clazz);
-                    }
-                }
+                _getAllClassesCache.addAll(
+                    classes
+                        .stream()
+                        .filter( clazz -> clazz.getName().toLowerCase().contains("jenkins") || clazz.getName().toLowerCase().contains("hudson"))
+                        .collect(Collectors.toList())
+                );
             }
             f.setAccessible(oldAccessible);
         } catch (NoSuchFieldException | IllegalAccessException e) {
