@@ -15,6 +15,7 @@ A graphql implementation for jenkins.
 [ ] Add allBuildsForJobs?
 [ ] Add allTestsForJobs?
 [ ] Fix index.jelly for description of plugin
+[ ] Log info for ```"message": "Can't resolve '/allUsers[0]/property[1]'. Abstract type 'hudson_model_UserProperty' must resolve to an Object type at runtime for field 'null.property'. Could not determine the exact type of 'hudson_model_UserProperty'"``` (and fix problem)
 
 ## "Feature Complete" query
 
