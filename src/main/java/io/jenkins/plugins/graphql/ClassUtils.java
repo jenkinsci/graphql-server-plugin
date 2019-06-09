@@ -94,7 +94,9 @@ public class ClassUtils {
             boolean oldAccessible = f.isAccessible();
             f.setAccessible(true);
             for (ClassLoader classLoader : classLoadersList) {
-                Vector<Class> classes =  (Vector<Class>) f.get(classLoader);
+                Vector<Class> classes =  new Vector<>(
+                    (Vector<Class>) f.get(classLoader)
+                );
                 _getAllClassesCache.addAll(
                     classes
                         .stream()
