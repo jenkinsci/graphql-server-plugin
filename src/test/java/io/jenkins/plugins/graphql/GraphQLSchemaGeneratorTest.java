@@ -1,14 +1,8 @@
 package io.jenkins.plugins.graphql;
 
-import com.cloudbees.plugins.credentials.CredentialsSelectHelper;
-import com.cloudbees.plugins.credentials.CredentialsStoreAction;
-import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
-import com.cloudbees.plugins.credentials.ViewCredentialsAction;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
-import com.google.gson.reflect.TypeToken;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -17,35 +11,27 @@ import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
-import hudson.model.Action;
-import hudson.model.CauseAction;
-import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.Job;
-import hudson.model.MyViewsProperty;
-import hudson.model.ParametersAction;
-import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
-import hudson.plugins.git.GitTagAction;
-import hudson.plugins.git.util.BuildData;
+import hudson.model.User;
+import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
 import net.sf.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.WithoutJenkins;
 import org.kohsuke.stapler.export.ExportedBean;
 import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -53,7 +39,6 @@ public class GraphQLSchemaGeneratorTest {
     @Rule
 
     public JenkinsRule j = new JenkinsRule();
-    private Builders builder;
     private GraphQLSchema graphQLSchema;
 
     @ExportedBean
@@ -68,7 +53,7 @@ public class GraphQLSchemaGeneratorTest {
 
         ClassUtils._getAllClassesCache = MockClassUtils.mock_getAllClassesList();
 
-        builder = new Builders();
+        Builders builder = new Builders();
         builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
         graphQLSchema = builder.buildSchema();
     }
@@ -103,6 +88,80 @@ public class GraphQLSchemaGeneratorTest {
         );
     }
 
+    @Test
+    public void getJobByName() throws IOException {
+        j.createFreeStyleProject("one");
+        j.createFreeStyleProject("two");
+
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput()
+            .query("query { allJobs(id: \"one\") { _class\nname } }")
+            .build();
+        ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+        if (executeResult.getErrors().size() != 0) {
+            throw new Error(executeResult.getErrors().get(0).getMessage());
+        }
+
+        assertEquals(
+            JSONObject.fromObject("{\"allJobs\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}"),
+            JSONObject.fromObject(executeResult.getData())
+        );
+    }
+
+    @Test
+    public void getJobByNameNonExistant() throws IOException {
+        j.createFreeStyleProject("one");
+        j.createFreeStyleProject("two");
+
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput()
+            .query("query { allJobs(id: \"nonexistant\") { _class\nname } }")
+            .build();
+        ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+        if (executeResult.getErrors().size() != 0) {
+            throw new Error(executeResult.getErrors().get(0).getMessage());
+        }
+
+        assertEquals(
+            JSONObject.fromObject("{\"allJobs\":[]}"),
+            JSONObject.fromObject(executeResult.getData())
+        );
+    }
+
+    @Test
+    public void getUserByName() throws IOException {
+        User.get("alice", true, Collections.emptyMap());
+
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput()
+            .query("query { allUsers(id: \"alice\") { _class\nid } }")
+            .build();
+        ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+        if (executeResult.getErrors().size() != 0) {
+            throw new Error(executeResult.getErrors().get(0).getMessage());
+        }
+
+        assertEquals(
+            JSONObject.fromObject("{\"allUsers\":[{\"_class\":\"hudson.model.User\",\"id\":\"alice\"}]}"),
+            JSONObject.fromObject(executeResult.getData())
+        );
+    }
+
+    @Test
+    public void getUserByNameNonExistant() throws IOException {
+        User.get("alice", true, Collections.emptyMap());
+
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput()
+            .query("query { allUsers(id: \"nonexistant\") { _class\nid } }")
+            .build();
+        ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
+        if (executeResult.getErrors().size() != 0) {
+            throw new Error(executeResult.getErrors().get(0).getMessage());
+        }
+
+        assertEquals(
+            JSONObject.fromObject("{\"allUsers\":[]}"),
+            JSONObject.fromObject(executeResult.getData())
+        );
+    }
+
     private ExecutionResult _queryDataSet(GraphQLSchema existingSchema, Object data, GraphQLOutputType graphqlRun, String fields) {
         GraphQLSchema builtSchema;
 
@@ -127,89 +186,6 @@ public class GraphQLSchemaGeneratorTest {
             Resources.getResource("introspectiveQuery.graphql"),
             Charsets.UTF_8
         );
-    }
-
-    private static class SchemaTypeResponse {
-        private final HashMap<String, Object> data = new HashMap<>();
-
-        private SchemaTypeResponse() {
-            this.data.putAll(new Gson().fromJson("{\n" +
-                "    \"inputFields\": {},\n" +
-                "    \"interfaces\": {},\n" +
-                "    \"possibleTypes\": {},\n" +
-                "    \"kind\": \"Object\",\n" +
-                "    \"name\": \"\",\n" +
-                "    \"description\": {},\n" +
-                "    \"fields\": [\n" +
-                "      {\n" +
-                "        \"name\": \"_class\",\n" +
-                "        \"description\": \"Class Name\",\n" +
-                "        \"args\": [],\n" +
-                "        \"type\": {\n" +
-                "          \"kind\": \"SCALAR\",\n" +
-                "          \"name\": \"String\",\n" +
-                "          \"ofType\": {}\n" +
-                "        },\n" +
-                "        \"isDeprecated\": false,\n" +
-                "        \"deprecationReason\": {}\n" +
-                "      }\n" +
-                "    ],\n" +
-                "    \"enumValues\": {}\n" +
-                "  }\n", new TypeToken<HashMap<String, Object>>() {}.getType()));
-        }
-
-        static SchemaTypeResponse newSchemaTypeResponse() {
-            return new SchemaTypeResponse();
-        }
-
-        public SchemaTypeResponse name(String name) {
-            this.data.put("name", name);
-            return this;
-        }
-
-        public SchemaTypeResponse description(String description) {
-            this.data.put("description", description);
-            return this;
-        }
-
-        public SchemaTypeResponse kind(String anInterface) {
-            this.data.put("kind", anInterface.toUpperCase());
-            return this;
-        }
-
-        public HashMap<String, Object> toHashMap() {
-            return this.data;
-        }
-
-        public SchemaTypeResponse possibleTypes(String json) {
-            ArrayList<Object> possibleTypes = new ArrayList<>();
-            if (this.data.get("possibleTypes") instanceof ArrayList) {
-                possibleTypes = (ArrayList<Object>) this.data.get("possibleTypes");
-            }
-            possibleTypes.add(new Gson().fromJson(json, HashMap.class));
-            this.data.put("possibleTypes", possibleTypes);
-            return this;
-        }
-
-        public SchemaTypeResponse interfaces(String json) {
-            ArrayList<Object> interfaces = new ArrayList<>();
-            if (this.data.get("interfaces") instanceof ArrayList) {
-                interfaces = (ArrayList<Object>) this.data.get("interfaces");
-            }
-            interfaces.add(new Gson().fromJson(json, HashMap.class));
-            this.data.put("interfaces", interfaces);
-            return this;
-        }
-
-        public SchemaTypeResponse fields(String json) {
-            ArrayList<Object> fields = new ArrayList<>();
-            if (this.data.get("fields") instanceof ArrayList) {
-                fields = (ArrayList<Object>) this.data.get("fields");
-            }
-            fields.add(new Gson().fromJson(json, LinkedTreeMap.class));
-            this.data.put("fields", fields);
-            return this;
-        }
     }
 
     @Test

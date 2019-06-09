@@ -56,5 +56,4 @@ public class BuildersTest {
         Assert.assertFalse(Builders.shouldIgnoreClass(hudson.model.Cause.UserIdCause.class));
         Assert.assertFalse(Builders.shouldIgnoreClass(hudson.model.CauseAction.class));
     }
-
 }

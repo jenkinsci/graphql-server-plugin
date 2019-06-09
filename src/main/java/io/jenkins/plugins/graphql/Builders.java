@@ -20,7 +20,6 @@ import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
-import hudson.model.Item;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.ModelObject;
@@ -34,18 +33,18 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -287,7 +286,7 @@ public class Builders {
         );
 
         for (Class clazz : TOP_LEVEL_CLASSES) {
-            queryType = builAllQuery(queryType, clazz);
+            queryType = queryType.field(buildAllQuery(clazz));
         }
 
         this.graphQLTypes = null;
@@ -351,8 +350,8 @@ public class Builders {
         return interfaceType.build();
     }
 
-    private GraphQLObjectType.Builder builAllQuery(GraphQLObjectType.Builder queryType, Class<ModelObject> clazz) {
-        return queryType.field(GraphQLFieldDefinition.newFieldDefinition()
+    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> clazz) {
+        return GraphQLFieldDefinition.newFieldDefinition()
             .name("all" + clazz.getSimpleName() + "s")
             .type(GraphQLList.list(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz))))
             .argument(GraphQLArgument.newArgument()
@@ -370,7 +369,7 @@ public class Builders {
                 .type(Scalars.GraphQLString)
             )
             .argument(GraphQLArgument.newArgument()
-                .name("ID")
+                .name("id")
                 .type(Scalars.GraphQLID)
             )
             .dataFetcher(new DataFetcher<Object>() {
@@ -392,28 +391,28 @@ public class Builders {
 
                     Iterable iterable;
                     if (_clazz == User.class) {
+                        if (id != null && !id.isEmpty()) {
+                            return Stream.of(User.get(id, false, Collections.emptyMap()))
+                                .filter(Objects::nonNull)
+                                .toArray();
+                        }
                         iterable = User.getAll();
                     } else {
+                        if (id != null && !id.isEmpty()) {
+                            return Stream.of(Objects.requireNonNull(Jenkins.getInstanceOrNull()).getItemByFullName(id))
+                                .filter(Objects::nonNull)
+                                .toArray();
+                        }
+
                         iterable = Items.allItems(
                             Jenkins.getAuthentication(),
                             Jenkins.getInstanceOrNull(),
                             _clazz
                         );
                     }
-
-                    if (id != null && !id.isEmpty()) {
-                        Method getIdMethod = _clazz.getMethod("getId");
-                        for (Object t : iterable) {
-                            if (getIdMethod.invoke(t).equals(id)) {
-                                return t;
-                            }
-                        }
-                    }
-
                     return Lists.newArrayList(slice(iterable, offset, limit));
                 }
-            })
-        );
+            });
     }
 
     public void addExtraTopLevelClasses(List<Class> clazzes) {
