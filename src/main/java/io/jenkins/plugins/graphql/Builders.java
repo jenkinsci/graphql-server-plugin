@@ -22,11 +22,11 @@ import graphql.schema.GraphQLTypeReference;
 import graphql.schema.TypeResolver;
 import hudson.model.Items;
 import hudson.model.Job;
-import hudson.model.ModelObject;
 import hudson.model.User;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
+import org.jenkinsci.plugins.uniqueid.IdStore;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
@@ -66,6 +66,17 @@ public class Builders {
             .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getName())
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
+    }
+    static private void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
+        if (IdStore.forClass(clazz) == null) {
+            return;
+        }
+        fieldBuilder.field(GraphQLFieldDefinition.newFieldDefinition()
+            .name("id")
+            .description("Unique ID")
+            .type(Scalars.GraphQLID)
+            .dataFetcher(dataFetcher -> IdStore.getId(dataFetcher.getSource()))
+        .build());
     }
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
@@ -157,7 +168,7 @@ public class Builders {
         return TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
     }
 
-    private void buildSchemaFromClass(Class clazz) {
+    private void buildSchemaFromClass(Class<?> clazz) {
         if (graphQLTypes.containsKey(clazz)) {
             return;
         }
@@ -169,7 +180,10 @@ public class Builders {
             MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
             GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
+            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz))
+                .field(makeClassFieldDefinition());
+            makeClassIdDefintion(clazz, fieldBuilder);
+
             interfaces.add(clazz);
             mockGraphQLTypes.put(
                 "__" + ClassUtils.getGraphQLClassName(clazz),
@@ -180,6 +194,8 @@ public class Builders {
                     .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
+            makeClassIdDefintion(clazz, mockGraphQLTypes.get("__" + ClassUtils.getGraphQLClassName(clazz)));
+
             graphQLTypes.put(clazz, fieldBuilder);
             return;
         }
@@ -201,7 +217,10 @@ public class Builders {
         Model<?> model = MODEL_BUILDER.get(clazz);
 
         GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
-        typeBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
+        typeBuilder
+            .name(ClassUtils.getGraphQLClassName(clazz))
+            .field(makeClassFieldDefinition());
+        makeClassIdDefintion(clazz, typeBuilder);
 
         ArrayList<Model<?>> queue = new ArrayList<>();
         queue.add(model);
@@ -221,7 +240,7 @@ public class Builders {
 
                 GraphQLOutputType className;
                 if ("id".equals(p.name)) {
-                    className = Scalars.GraphQLID;
+                    continue; /// we handle it in a different way
                 } else if (propertyClazz.isArray()) {
                     className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
                 } else if (Collection.class.isAssignableFrom(propertyClazz)) {
@@ -233,7 +252,7 @@ public class Builders {
                 GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition()
                     .name(p.name)
                     .type(className)
-                    .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource());
+                    .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()));
 
                 if (className instanceof GraphQLList) {
                     fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
@@ -241,16 +260,26 @@ public class Builders {
                         int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
                         String id = dataFetchingEnvironment.getArgument("id"); // FIXME
 
-                        Object[] values = (Object[]) p.getValue(dataFetchingEnvironment.getSource());
-                        return Lists.newArrayList(
-                            Iterators.limit(
-                                Iterables.skip(
-                                    Arrays.asList(values),
-                                    offset
-                                ).iterator(),
-                                limit
-                            )
-                        );
+                        List<?> valuesList;
+                        Object values = p.getValue(dataFetchingEnvironment.getSource());
+                        if (values instanceof List) {
+                            valuesList = ((List<?>)values);
+                        } else {
+                            valuesList = Arrays.asList((Object[]) values);
+
+                        }
+                        if (id != null && !id.isEmpty()) {
+                            for (Object value : valuesList) {
+                                String objectId = IdStore.getId(value);
+                                if (id.equals(objectId)) {
+                                    return Stream.of(value).toArray();
+                                }
+                            }
+                            return null;
+                        }
+
+                        Iterator<?> iterator = Iterables.skip(valuesList, offset).iterator();
+                        return Lists.newArrayList(Iterators.limit(iterator, limit));
                     });
                     fieldBuilder.argument(GraphQLArgument.newArgument()
                             .name("offset")
