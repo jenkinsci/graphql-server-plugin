@@ -121,7 +121,7 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            JSONObject.fromObject("{\"allJobs\":[]}"),
+            JSONObject.fromObject("{\"allJobs\":[ ]}"),
             JSONObject.fromObject(executeResult.getData())
         );
     }

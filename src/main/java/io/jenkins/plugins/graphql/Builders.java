@@ -230,13 +230,48 @@ public class Builders {
                     className = createSchemaClassName(propertyClazz);
                 }
 
-                typeBuilder = typeBuilder.field(
-                    GraphQLFieldDefinition.newFieldDefinition()
-                        .name(p.name)
-                        .type(className)
-                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()))
-                        .build()
-                );
+                GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition()
+                    .name(p.name)
+                    .type(className)
+                    .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource());
+
+                if (className instanceof GraphQLList) {
+                    fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
+                        int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
+                        int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
+                        String id = dataFetchingEnvironment.getArgument("id"); // FIXME
+
+                        Object[] values = (Object[]) p.getValue(dataFetchingEnvironment.getSource());
+                        return Lists.newArrayList(
+                            Iterators.limit(
+                                Iterables.skip(
+                                    Arrays.asList(values),
+                                    offset
+                                ).iterator(),
+                                limit
+                            )
+                        );
+                    });
+                    fieldBuilder.argument(GraphQLArgument.newArgument()
+                            .name("offset")
+                            .type(Scalars.GraphQLInt)
+                            .defaultValue(0)
+                        )
+                        .argument(GraphQLArgument.newArgument()
+                            .name("limit")
+                            .type(Scalars.GraphQLInt)
+                            .defaultValue(100)
+                        )
+                        .argument(GraphQLArgument.newArgument()
+                            .name("type")
+                            .type(Scalars.GraphQLString)
+                        )
+                        .argument(GraphQLArgument.newArgument()
+                            .name("id")
+                            .type(Scalars.GraphQLID)
+                        );
+                }
+                typeBuilder = typeBuilder.field(fieldBuilder.build());
             }
         }
         return typeBuilder;
