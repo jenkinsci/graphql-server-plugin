@@ -23,12 +23,14 @@ A graphql implementation for jenkins.
 query {
   allJobs {
     name
+    id
     _class
     actions {
       _class
     }
     allBuilds {
       _class
+      id
       actions {
         _class
         ... on hudson_model_CauseAction {
