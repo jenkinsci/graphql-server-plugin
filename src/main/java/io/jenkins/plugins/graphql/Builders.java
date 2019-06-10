@@ -281,7 +281,7 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        classQueue.addAll(this.TOP_LEVEL_CLASSES);
+        classQueue.addAll(TOP_LEVEL_CLASSES);
         classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
