@@ -200,8 +200,8 @@ public class Builders {
 
         Model<?> model = MODEL_BUILDER.get(clazz);
 
-        GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-        fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
+        GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
+        typeBuilder.name(ClassUtils.getGraphQLClassName(clazz)).field(makeClassFieldDefinition());
 
         ArrayList<Model<?>> queue = new ArrayList<>();
         queue.add(model);
@@ -214,7 +214,7 @@ public class Builders {
 
         for (Model<?> _model : queue) {
             for (Property p : _model.getProperties()) {
-                if (fieldBuilder.hasField(p.name)) {
+                if (typeBuilder.hasField(p.name)) {
                     continue;
                 }
                 Class propertyClazz = p.getType();
@@ -230,7 +230,7 @@ public class Builders {
                     className = createSchemaClassName(propertyClazz);
                 }
 
-                fieldBuilder = fieldBuilder.field(
+                typeBuilder = typeBuilder.field(
                     GraphQLFieldDefinition.newFieldDefinition()
                         .name(p.name)
                         .type(className)
@@ -239,7 +239,7 @@ public class Builders {
                 );
             }
         }
-        return fieldBuilder;
+        return typeBuilder;
     }
 
     @SuppressWarnings("rawtypes")
