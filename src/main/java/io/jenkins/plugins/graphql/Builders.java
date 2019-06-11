@@ -87,11 +87,6 @@ public class Builders {
         RunWithSCM.class
     ));
 
-    /*package*/ private static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
-        Job.class,
-        User.class
-    ));
-
     static {
         javaTypesToGraphqlTypes.put("boolean", Scalars.GraphQLBoolean);
         javaTypesToGraphqlTypes.put(Boolean.class.getSimpleName(), Scalars.GraphQLBoolean);
@@ -316,7 +311,11 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        classQueue.addAll(TOP_LEVEL_CLASSES);
+        queryType.field(buildAllQuery(Job.class));
+        queryType.field(buildAllQuery(User.class));
+
+        classQueue.add(Job.class);
+        classQueue.add(User.class);
         classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
@@ -354,10 +353,6 @@ public class Builders {
                 .filter(distinctByKey(GraphQLObjectType::getName))
                 .collect(Collectors.toList())
         );
-
-        for (Class clazz : TOP_LEVEL_CLASSES) {
-            queryType = queryType.field(buildAllQuery(clazz));
-        }
 
         this.graphQLTypes = null;
         this.mockGraphQLTypes = null;
@@ -432,7 +427,7 @@ public class Builders {
     public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> clazz) {
         return GraphQLFieldDefinition.newFieldDefinition()
             .name("all" + clazz.getSimpleName() + "s")
-            .type(GraphQLList.list(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz))))
+            .type(GraphQLList.list(createSchemaClassName(clazz)))
             .argument(GraphQLArgument.newArgument()
                 .name("offset")
                 .type(Scalars.GraphQLInt)
