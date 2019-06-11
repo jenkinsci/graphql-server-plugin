@@ -6,16 +6,16 @@ A graphql implementation for jenkins.
 
 ## TODO
 
-[X] Remove hacked in security stuff entirely (mostly commented out atm)
-[X] Abstract classes should be handled the same as interfaces
-[ ] Create whoami function to output who you are
-[X] Remove allFreestyleJobs, and just allow class to be passed into allJobs
-[X] Add "id" argument to allQueryTypes
-[X] Add all the query and pagination items to list[] fields?
-[ ] Add allBuildsForJobs?
-[ ] Add allTestsForJobs?
-[ ] Fix index.jelly for description of plugin
-[ ] Log info for ```"message": "Can't resolve '/allUsers[0]/property[1]'. Abstract type 'hudson_model_UserProperty' must resolve to an Object type at runtime for field 'null.property'. Could not determine the exact type of 'hudson_model_UserProperty'"``` (and fix problem)
+* [X] Remove hacked in security stuff entirely (mostly commented out atm)
+* [X] Abstract classes should be handled the same as interfaces
+* [ ] Create whoami function to output who you are
+* [X] Remove allFreestyleJobs, and just allow class to be passed into allJobs
+* [X] Add "id" argument to allQueryTypes
+* [X] Add all the query and pagination items to list[] fields?
+* [ ] Add allBuildsForJobs?
+* [ ] Add allTestsForJobs?
+* [ ] Fix index.jelly for description of plugin
+* [ ] Log info for ```"message": "Can't resolve '/allUsers[0]/property[1]'. Abstract type 'hudson_model_UserProperty' must resolve to an Object type at runtime for field 'null.property'. Could not determine the exact type of 'hudson_model_UserProperty'"``` (and fix problem)
 
 ## "Feature Complete" query
 
