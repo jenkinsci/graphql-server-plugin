@@ -206,7 +206,6 @@ public class GraphQLSchemaGeneratorTest {
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"io_jenkins_plugins_graphql_GraphQLRootAction\", \"ofType\":{}}")
                 .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "hudson_model_Action")),
@@ -240,7 +239,12 @@ public class GraphQLSchemaGeneratorTest {
                     "        \"name\": \"hudson_model_Action\",\n" +
                     "        \"ofType\": {}\n" +
                     "      }\n")
-                .fields("{\"name\":\"causes\",\"description\":{},\"args\":[],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
+                .fields("{\"name\":\"causes\",\"description\":{},\"args\":["+
+                        "{\"name\":\"id\", \"description\":{}, \"type\":{\"kind\":\"SCALAR\", \"name\":\"ID\", \"ofType\":{}}, \"defaultValue\":{}},"+
+                        "{\"name\":\"limit\", \"description\":{}, type={\"kind\":\"SCALAR\", \"name\":\"Int\", \"ofType\":{}}, \"defaultValue\":\"100\"},"+
+                        "{\"name\":\"offset\", \"description\":{}, \"type\":{\"kind\":SCALAR, \"name\":\"Int\", \"ofType\":{}}, \"defaultValue\":\"0\"},"+
+                        "{\"name\":\"type\", \"description\":{}, \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"defaultValue\":{}}"+
+                    "],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
                 .toHashMap(),
             new Gson().fromJson(
                 new Gson().toJson(getSchemaType(executionResult, "hudson_model_CauseAction")),

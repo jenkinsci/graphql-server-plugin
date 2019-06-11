@@ -89,4 +89,14 @@ public class SchemaTypeResponse {
         this.data.put("fields", fields);
         return this;
     }
+
+    public SchemaTypeResponse args(String json) {
+        ArrayList<Object> args = new ArrayList<>();
+        if (this.data.get("args") instanceof ArrayList) {
+            args = (ArrayList<Object>) this.data.get("args");
+        }
+        args.add(new Gson().fromJson(json, HashMap.class));
+        this.data.put("args", args);
+        return this;
+    }
 }
