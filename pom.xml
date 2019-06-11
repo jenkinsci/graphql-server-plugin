@@ -89,11 +89,6 @@
             <version>1.18</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.jenkins-ci.plugins</groupId>
-            <artifactId>unique-id</artifactId>
-            <version>2.2.0</version>
-        </dependency>
     </dependencies>
 
     <build>

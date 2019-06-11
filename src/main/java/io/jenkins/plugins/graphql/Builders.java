@@ -26,13 +26,13 @@ import hudson.model.User;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
-import org.jenkinsci.plugins.uniqueid.IdStore;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,14 +68,15 @@ public class Builders {
             .build();
     }
     static private void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
-        if (IdStore.forClass(clazz) == null) {
+        final Method idMethod = IdFinder.idMethod(clazz);
+        if (idMethod == null) {
             return;
         }
         fieldBuilder.field(GraphQLFieldDefinition.newFieldDefinition()
             .name("id")
             .description("Unique ID")
             .type(Scalars.GraphQLID)
-            .dataFetcher(dataFetcher -> IdStore.getId(dataFetcher.getSource()))
+            .dataFetcher(dataFetcher -> idMethod.invoke(dataFetcher.getSource()))
         .build());
     }
 
@@ -270,7 +271,12 @@ public class Builders {
                         }
                         if (id != null && !id.isEmpty()) {
                             for (Object value : valuesList) {
-                                String objectId = IdStore.getId(value);
+                                Method method = IdFinder.idMethod(value.getClass());
+                                if (method == null) {
+                                    continue;
+                                }
+
+                                String objectId = String.valueOf(method.invoke(value));
                                 if (id.equals(objectId)) {
                                     return Stream.of(value).toArray();
                                 }
