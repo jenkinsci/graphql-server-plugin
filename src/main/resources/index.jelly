@@ -1,4 +1,4 @@
 <?jelly escape-by-default='true'?>
 <div>
-    GraphQL server
+    A GraphQL implementation of the Jenkins API
 </div>
