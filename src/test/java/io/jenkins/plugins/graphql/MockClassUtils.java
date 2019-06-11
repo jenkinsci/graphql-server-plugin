@@ -8,6 +8,8 @@ public class MockClassUtils {
     public static Set<Class> mock_getAllClassesList() {
         return new HashSet<>(
             Arrays.asList(
+                GraphQLSchemaGeneratorTest.FakeRun.class,
+
                 hudson.model.AbstractBuild.AbstractBuildExecution.class,
                 hudson.model.AbstractBuild.DependencyChange.class,
                 hudson.model.AbstractBuild.class,
