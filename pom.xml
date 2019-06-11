@@ -31,6 +31,13 @@
         <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
     </scm>
     -->
+    <developers>
+        <developer>
+            <id>halkeye</id>
+            <name>Gavin Mogan</name>
+            <email>jenkins@gavinmogan.com</email>
+        </developer>
+    </developers>
     <dependencies>
         <dependency>
             <groupId>com.graphql-java</groupId>
