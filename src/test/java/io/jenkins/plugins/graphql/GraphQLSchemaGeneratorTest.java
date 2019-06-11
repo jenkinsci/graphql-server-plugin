@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -178,7 +179,7 @@ public class GraphQLSchemaGeneratorTest {
         String CrumbValue = crumbIssuer.getCrumb();
 
         JSONObject body = new JSONObject();
-        body.put("query", body);
+        body.put("query", query);
 
         HttpResponse<JsonNode> response = Unirest.post(j.jenkins.getRootUrl() + "graphql/")
             .header("Content-Type","application/json")
@@ -196,23 +197,24 @@ public class GraphQLSchemaGeneratorTest {
             null,
             null,
             "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
-        ).getJSONObject("whoAmiI");
+        );
+        JSONObject whoamiData = data.getJSONObject("whoAmI");
 
         assertEquals(
-            new String[] { "anonymous" },
-            data.getJSONArray("authorities")
+            "anonymous",
+            whoamiData.getJSONArray("authorities").getString(0)
         );
         assertEquals(
             null,
-            data.getString("details")
+            whoamiData.optString("details", null)
         );
         assertEquals(
             true,
-            data.getBoolean("anonymous")
+            whoamiData.getBoolean("anonymous")
         );
         assertEquals(
             "anonymous",
-            data.getString("name")
+            whoamiData.getString("name")
         );
     }
 
@@ -222,23 +224,25 @@ public class GraphQLSchemaGeneratorTest {
             "alice",
             "alice",
             "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
-        ).getJSONObject("whoAmiI");
+        );
+
+        JSONObject whoamiData = data.getJSONObject("whoAmI");
 
         assertEquals(
-            new String[] { "anonymous" },
-            data.getJSONArray("authorities")
+            "anonymous",
+            whoamiData.getJSONArray("authorities").getString(0)
         );
         assertEquals(
             null,
-            data.getString("details")
+            whoamiData.optString("details", null)
         );
         assertEquals(
             true,
-            data.getBoolean("anonymous")
+            whoamiData.getBoolean("anonymous")
         );
         assertEquals(
             "anonymous",
-            data.getString("name")
+            whoamiData.getString("name")
         );
     }
 
