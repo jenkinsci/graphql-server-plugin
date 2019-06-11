@@ -35,6 +35,13 @@ query {
       id
       actions {
         _class
+        ... on hudson_tasks_junit_TestResultAction {
+          _class
+          failCount
+          skipCount
+          totalCount
+          urlName
+        }
         ... on hudson_model_CauseAction {
           causes {
             _class
