@@ -19,10 +19,13 @@ import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
+import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
+import hudson.model.Action;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
+import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
@@ -313,6 +316,7 @@ public class Builders {
 
         queryType.field(buildAllQuery(Job.class));
         queryType.field(buildAllQuery(User.class));
+        queryType.field(buildActionQuery(WhoAmI.class));
 
         classQueue.add(Job.class);
         classQueue.add(User.class);
@@ -487,6 +491,23 @@ public class Builders {
                     return Lists.newArrayList(slice(iterable, offset, limit));
                 }
             });
+    }
+
+    private GraphQLFieldDefinition buildActionQuery(Class<? extends Action> actionClazz) {
+        Action action;
+        try {
+            action = actionClazz.newInstance();
+        } catch (InstantiationException e) {
+            return null;
+        } catch (IllegalAccessException e) {
+            return null;
+        }
+
+        return GraphQLFieldDefinition.newFieldDefinition()
+            .name(action.getUrlName())
+            .type(createSchemaClassName(actionClazz))
+            .dataFetcher(new StaticDataFetcher(action))
+            .build();
     }
 
     public void addExtraTopLevelClasses(List<Class> clazzes) {

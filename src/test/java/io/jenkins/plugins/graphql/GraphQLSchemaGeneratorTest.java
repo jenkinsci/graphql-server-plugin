@@ -3,6 +3,10 @@ package io.jenkins.plugins.graphql;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.JsonNode;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -15,8 +19,9 @@ import hudson.model.FreeStyleProject;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.User;
+import hudson.security.csrf.CrumbIssuer;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
-import net.sf.json.JSONObject;
+import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -31,8 +36,11 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class GraphQLSchemaGeneratorTest {
@@ -54,8 +62,9 @@ public class GraphQLSchemaGeneratorTest {
         ClassUtils._getAllClassesCache = MockClassUtils.mock_getAllClassesList();
 
         Builders builder = new Builders();
-        builder.addExtraTopLevelClasses(Arrays.asList(FreeStyleProject.class));
+        builder.addExtraTopLevelClasses(Collections.singletonList(FreeStyleProject.class));
         graphQLSchema = builder.buildSchema();
+        GraphQLRootAction.setBuiltSchema(graphQLSchema);
     }
 
     @Test
@@ -70,8 +79,8 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, run, graphqlRun, "timestamp");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\": {\"timestamp\": \"2019-05-31T23:16:17.604Z\"}}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"test\": {\"timestamp\": \"2019-05-31T23:16:17.604Z\"}}", Map.class),
+            executeResult.getData()
         );
     }
 
@@ -83,8 +92,8 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            JSONObject.fromObject("{\"test\":{\"_class\":\"hudson.model.FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins.model.RenameAction\"},{\"_class\":\"com.cloudbees.plugins.credentials.ViewCredentialsAction\"}]}}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"test\":{\"_class\":\"hudson.model.FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins.model.RenameAction\"},{\"_class\":\"com.cloudbees.plugins.credentials.ViewCredentialsAction\"}]}}", Map.class),
+            executeResult.getData()
         );
     }
 
@@ -102,8 +111,8 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            JSONObject.fromObject("{\"allJobs\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"allJobs\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}", Map.class),
+            executeResult.getData()
         );
     }
 
@@ -121,8 +130,8 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            JSONObject.fromObject("{\"allJobs\":[ ]}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"allJobs\":[ ]}", Map.class),
+            executeResult.getData()
         );
     }
 
@@ -139,8 +148,8 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            JSONObject.fromObject("{\"allUsers\":[{\"_class\":\"hudson.model.User\",\"id\":\"alice\"}]}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"allUsers\":[{\"_class\":\"hudson.model.User\",\"id\":\"alice\"}]}", Map.class),
+            executeResult.getData()
         );
     }
 
@@ -157,8 +166,79 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            JSONObject.fromObject("{\"allUsers\":[]}"),
-            JSONObject.fromObject(executeResult.getData())
+            new Gson().fromJson("{\"allUsers\":[]}", Map.class),
+            executeResult.getData()
+        );
+    }
+
+    public JSONObject postQuery(String username, String password, String query) throws UnirestException {
+        CrumbIssuer crumbIssuer = j.jenkins.getCrumbIssuer();
+        assertNotNull(crumbIssuer);
+        String CrumbField = crumbIssuer.getCrumbRequestField();
+        String CrumbValue = crumbIssuer.getCrumb();
+
+        JSONObject body = new JSONObject();
+        body.put("query", body);
+
+        HttpResponse<JsonNode> response = Unirest.post(j.jenkins.getRootUrl() + "graphql/")
+            .header("Content-Type","application/json")
+            .basicAuth(username, password)
+            .header( CrumbField, CrumbValue )
+            .body(body.toString())
+            .asJson();
+        assertEquals(200, response.getStatus());
+        return response.getBody().getObject().getJSONObject("data");
+    }
+
+    @Test
+    public void whoamiNoAuth() throws UnirestException {
+        JSONObject data = postQuery(
+            null,
+            null,
+            "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
+        ).getJSONObject("whoAmiI");
+
+        assertEquals(
+            new String[] { "anonymous" },
+            data.getJSONArray("authorities")
+        );
+        assertEquals(
+            null,
+            data.getString("details")
+        );
+        assertEquals(
+            true,
+            data.getBoolean("anonymous")
+        );
+        assertEquals(
+            "anonymous",
+            data.getString("name")
+        );
+    }
+
+    @Test
+    public void whoamiAuth() throws UnirestException {
+        JSONObject data = postQuery(
+            "alice",
+            "alice",
+            "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
+        ).getJSONObject("whoAmiI");
+
+        assertEquals(
+            new String[] { "anonymous" },
+            data.getJSONArray("authorities")
+        );
+        assertEquals(
+            null,
+            data.getString("details")
+        );
+        assertEquals(
+            true,
+            data.getBoolean("anonymous")
+        );
+        assertEquals(
+            "anonymous",
+            data.getString("name")
         );
     }
 
@@ -274,8 +354,11 @@ public class GraphQLSchemaGeneratorTest {
     }
 
     private Object getSchemaType(ExecutionResult executionResult, String typeName) {
-        return JSONObject.fromObject(executionResult.getData()).getJSONObject("__schema").getJSONArray("types").stream().filter(
-            type -> ((JSONObject) type).getString("name").equals(typeName)
+        Map data = executionResult.getData();
+        Map schema = (Map) data.get("__schema");
+        Map[] types = (Map[]) schema.get("types");
+        return Stream.of(types).filter(
+            type -> ((Map) type).get("name").equals(typeName)
         ).toArray()[0];
     }
 }
