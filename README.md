@@ -11,7 +11,7 @@ A graphql implementation for jenkins.
 [ ] Create whoami function to output who you are
 [X] Remove allFreestyleJobs, and just allow class to be passed into allJobs
 [X] Add "id" argument to allQueryTypes
-[ ] Add all the query and pagination items to list[] fields?
+[X] Add all the query and pagination items to list[] fields?
 [ ] Add allBuildsForJobs?
 [ ] Add allTestsForJobs?
 [ ] Fix index.jelly for description of plugin
