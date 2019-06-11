@@ -36,6 +36,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -291,10 +292,7 @@ public class GraphQLSchemaGeneratorTest {
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
                 .toHashMap(),
-            new Gson().fromJson(
-                new Gson().toJson(getSchemaType(executionResult, "hudson_model_Action")),
-                HashMap.class
-            )
+            getSchemaType(executionResult, "hudson_model_Action")
         );
 
         assertEquals(
@@ -360,8 +358,8 @@ public class GraphQLSchemaGeneratorTest {
     private Object getSchemaType(ExecutionResult executionResult, String typeName) {
         Map data = executionResult.getData();
         Map schema = (Map) data.get("__schema");
-        Map[] types = (Map[]) schema.get("types");
-        return Stream.of(types).filter(
+        List types = (List) schema.get("types");
+        return types.stream().filter(
             type -> ((Map) type).get("name").equals(typeName)
         ).toArray()[0];
     }
