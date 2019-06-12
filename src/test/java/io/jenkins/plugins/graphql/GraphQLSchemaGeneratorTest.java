@@ -316,11 +316,7 @@ public class GraphQLSchemaGeneratorTest {
                 .name("__hudson_model_Action")
                 .description("Generic implementation of Action with just _class defined")
                 .kind("OBJECT")
-                .interfaces("{\n" +
-                    "        \"kind\": \"INTERFACE\",\n" +
-                    "        \"name\": \"hudson_model_Action\",\n" +
-                    "        \"ofType\": null\n" +
-                    "      }\n")
+                .interfaces("INTERFACE", "hudson_model_Action", null)
                 .toHashMap(),
             __actionType
         );
@@ -329,11 +325,7 @@ public class GraphQLSchemaGeneratorTest {
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_CauseAction")
                 .kind("OBJECT")
-                .interfaces("{\n" +
-                    "        \"kind\": \"INTERFACE\",\n" +
-                    "        \"name\": \"hudson_model_Action\",\n" +
-                    "        \"ofType\": null\n" +
-                    "      }\n")
+                .interfaces("INTERFACE", "hudson_model_Action", null)
                 .fields("{\"name\":\"causes\",\"description\":null,\"args\":["+
                         "{\"name\":\"id\", \"description\":null, \"type\":{\"kind\":\"SCALAR\", \"name\":\"ID\", \"ofType\": null}, \"defaultValue\":null},"+
                         "{\"name\":\"limit\", \"description\":null, type={\"kind\":\"SCALAR\", \"name\":\"Int\", \"ofType\": null}, \"defaultValue\":\"100\"},"+
@@ -348,11 +340,7 @@ public class GraphQLSchemaGeneratorTest {
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Cause_UserIdCause")
                 .kind("OBJECT")
-                .interfaces("{\n" +
-                    "        \"kind\": \"INTERFACE\",\n" +
-                    "        \"name\": \"hudson_model_Cause\",\n" +
-                    "        \"ofType\": null\n" +
-                    "      }\n")
+                .interfaces("INTERFACE", "hudson_model_Action", null)
                 .fields("{\"name\":\"shortDescription\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
                 .fields("{\"name\":\"userId\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
                 .fields("{\"name\":\"userName\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")

@@ -70,12 +70,17 @@ public class SchemaTypeResponse {
         return this;
     }
 
-    public SchemaTypeResponse interfaces(String json) {
+    public SchemaTypeResponse interfaces(String kind, String name, String ofType) {
         ArrayList<Object> interfaces = new ArrayList<>();
         if (this.data.get("interfaces") instanceof ArrayList) {
             interfaces = (ArrayList<Object>) this.data.get("interfaces");
         }
-        interfaces.add(new Gson().fromJson(json, HashMap.class));
+        HashMap<String, Object> newInterface = new HashMap<>();
+        newInterface.put("kind", kind);
+        newInterface.put("name", name);
+        newInterface.put("ofType", ofType);
+
+        interfaces.add(newInterface);
         this.data.put("interfaces", interfaces);
         return this;
     }
