@@ -19,13 +19,13 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh 'mvn compile'
+                sh 'mvn -B compile'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn verify test'
+                sh 'mvn -B verify test'
             }
             post {
                 always {
@@ -43,7 +43,7 @@ pipeline {
 
         stage('Package') {
             steps {
-                sh 'mvn package'
+                sh 'mvn -B package'
                 archiveArtifacts 'target/*.hpi'
             }
         }
