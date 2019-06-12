@@ -468,6 +468,7 @@ public class Builders {
                 @Override
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                     Class _clazz = clazz;
+                    Jenkins instance = Jenkins.getInstanceOrNull();
                     int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                     int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
                     String clazzName = dataFetchingEnvironment.getArgument("type");
@@ -487,7 +488,10 @@ public class Builders {
                         iterable = User.getAll();
                     } else {
                         if (id != null && !id.isEmpty()) {
-                            return Stream.of(Objects.requireNonNull(Jenkins.getInstanceOrNull()).getItemByFullName(id))
+                            if (instance == null) {
+                                throw new RuntimeException("Should never actually be null");
+                            }
+                            return Stream.of(instance.getItemByFullName(id))
                                 .filter(Objects::nonNull)
                                 .toArray();
                         }
