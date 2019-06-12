@@ -218,8 +218,9 @@ public class Builders {
 
         GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
 
-        if (Jenkins.getInstanceOrNull() != null) {
-            Descriptor descriptor = Jenkins.getInstanceOrNull().getDescriptor(clazz);
+        Jenkins instance = Jenkins.getInstanceOrNull();
+        if (instance != null) {
+            Descriptor descriptor = instance.getDescriptor(clazz);
             if (descriptor != null) {
                 typeBuilder.description(descriptor.getDisplayName());
             }
