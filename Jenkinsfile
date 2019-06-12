@@ -34,7 +34,7 @@ pipeline {
                     script {
                         // def scannerHome = tool 'SonarQube Scanner 3.3';
                         withSonarQubeEnv {
-                            sh "mvn ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
+                            sh "mvn -B ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
                         }
                     }
                 }
