@@ -3,11 +3,13 @@ package io.jenkins.plugins.graphql;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
+import graphql.schema.GraphQLSchema;
 import hudson.DescriptorExtensionList;
 import hudson.Extension;
 import hudson.init.InitMilestone;
 import hudson.init.Initializer;
 import hudson.model.Actionable;
+import hudson.model.RootAction;
 import hudson.model.TopLevelItemDescriptor;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONNull;
@@ -30,7 +32,7 @@ import java.util.stream.Collectors;
 
 @Extension
 @SuppressWarnings("unused")
-public class GraphQLRootAction extends Actionable implements hudson.model.RootAction {
+public class GraphQLRootAction extends Actionable implements RootAction {
     private final static Logger LOGGER = Logger.getLogger(GraphQLRootAction.class.getName());
     private static GraphQL builtSchema;
 
@@ -65,6 +67,10 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
         }
     }
 
+    public static void setBuiltSchema(GraphQLSchema schema) {
+        builtSchema = GraphQL.newGraphQL(schema).build();
+    }
+
     public static String optString(JSONObject json, String key, String defaultValue)
     {
         // http://code.google.com/p/android/issues/detail?id=13830
@@ -84,7 +90,6 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
         Map<String, String[]> parameterMap = req.getParameterMap();
 
         String body = IOUtils.toString(req.getInputStream(), "UTF-8");
-        LOGGER.info("Body: " + body);
 
         if ("application/graphql".equals(req.getContentType())) {
             query = body;
@@ -101,6 +106,7 @@ public class GraphQLRootAction extends Actionable implements hudson.model.RootAc
                 variables = (HashMap<String, Object>) jsonVariables.toBean(HashMap.class);
             }
         }
+        LOGGER.info("Query: " + query);
 
         if (query.isEmpty()) {
             rsp.setStatus(HttpServletResponse.SC_OK);

@@ -19,10 +19,14 @@ import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
+import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
+import hudson.model.Action;
+import hudson.model.Descriptor;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
+import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import jenkins.scm.RunWithSCM;
@@ -85,11 +89,6 @@ public class Builders {
     /*package*/ private static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
         Job.class,
         RunWithSCM.class
-    ));
-
-    /*package*/ private static final Set<Class> TOP_LEVEL_CLASSES = new HashSet<>(Arrays.asList(
-        Job.class,
-        User.class
     ));
 
     static {
@@ -218,6 +217,14 @@ public class Builders {
         Model<?> model = MODEL_BUILDER.get(clazz);
 
         GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
+
+        if (Jenkins.getInstanceOrNull() != null) {
+            Descriptor descriptor = Jenkins.getInstanceOrNull().getDescriptor(clazz);
+            if (descriptor != null) {
+                typeBuilder.description(descriptor.getDisplayName());
+            }
+        }
+
         typeBuilder
             .name(ClassUtils.getGraphQLClassName(clazz))
             .field(makeClassFieldDefinition());
@@ -316,7 +323,12 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        classQueue.addAll(TOP_LEVEL_CLASSES);
+        queryType.field(buildAllQuery(Job.class));
+        queryType.field(buildAllQuery(User.class));
+        queryType.field(buildActionQuery(WhoAmI.class));
+
+        classQueue.add(Job.class);
+        classQueue.add(User.class);
         classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
@@ -354,10 +366,6 @@ public class Builders {
                 .filter(distinctByKey(GraphQLObjectType::getName))
                 .collect(Collectors.toList())
         );
-
-        for (Class clazz : TOP_LEVEL_CLASSES) {
-            queryType = queryType.field(buildAllQuery(clazz));
-        }
 
         this.graphQLTypes = null;
         this.mockGraphQLTypes = null;
@@ -432,7 +440,7 @@ public class Builders {
     public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> clazz) {
         return GraphQLFieldDefinition.newFieldDefinition()
             .name("all" + clazz.getSimpleName() + "s")
-            .type(GraphQLList.list(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz))))
+            .type(GraphQLList.list(createSchemaClassName(clazz)))
             .argument(GraphQLArgument.newArgument()
                 .name("offset")
                 .type(Scalars.GraphQLInt)
@@ -492,6 +500,23 @@ public class Builders {
                     return Lists.newArrayList(slice(iterable, offset, limit));
                 }
             });
+    }
+
+    private GraphQLFieldDefinition buildActionQuery(Class<? extends Action> actionClazz) {
+        Action action;
+        try {
+            action = actionClazz.newInstance();
+        } catch (InstantiationException e) {
+            return null;
+        } catch (IllegalAccessException e) {
+            return null;
+        }
+
+        return GraphQLFieldDefinition.newFieldDefinition()
+            .name(action.getUrlName())
+            .type(createSchemaClassName(actionClazz))
+            .dataFetcher(new StaticDataFetcher(action))
+            .build();
     }
 
     public void addExtraTopLevelClasses(List<Class> clazzes) {
