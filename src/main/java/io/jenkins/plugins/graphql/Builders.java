@@ -38,6 +38,7 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -62,7 +63,7 @@ public class Builders {
     private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
 
-    static private GraphQLFieldDefinition makeClassFieldDefinition() {
+    private static GraphQLFieldDefinition makeClassFieldDefinition() {
         return GraphQLFieldDefinition.newFieldDefinition()
             .name("_class")
             .description("Class Name")
@@ -71,7 +72,7 @@ public class Builders {
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
     }
-    static private void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
+    private static void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
         final Method idMethod = IdFinder.idMethod(clazz);
         if (idMethod == null) {
             return;
@@ -202,7 +203,7 @@ public class Builders {
         graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz));
     }
 
-    public static boolean shouldIgnoreClass(Class clazz) {
+    static boolean shouldIgnoreClass(Class clazz) {
         if (clazz.isAnnotationPresent(NoExternalUse.class)) {
             return true;
         }
@@ -212,7 +213,7 @@ public class Builders {
         return false;
     }
 
-    protected GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
+    GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
 
         Model<?> model = MODEL_BUILDER.get(clazz);
 
@@ -267,7 +268,7 @@ public class Builders {
                     fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
                         int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
                         int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                        String id = dataFetchingEnvironment.getArgument("id"); // FIXME
+                        String id = dataFetchingEnvironment.getArgument("id");
 
                         List<?> valuesList;
                         Object values = p.getValue(dataFetchingEnvironment.getSource());
@@ -406,7 +407,7 @@ public class Builders {
 //                    .collect(Collectors.toList());
                 for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
                     name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
-                    LOGGER.info("Attempting to find subclass: " + name);
+                    LOGGER.info(MessageFormat.format("Attempting to find subclass: {0}", name));
                     GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                     if (objectType != null) {
                         return objectType;
@@ -511,9 +512,7 @@ public class Builders {
         Action action;
         try {
             action = actionClazz.newInstance();
-        } catch (InstantiationException e) {
-            return null;
-        } catch (IllegalAccessException e) {
+        } catch (InstantiationException | IllegalAccessException e) {
             return null;
         }
 
