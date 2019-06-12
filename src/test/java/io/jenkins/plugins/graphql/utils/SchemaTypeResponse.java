@@ -81,6 +81,7 @@ public class SchemaTypeResponse {
         newInterface.put("ofType", ofType);
 
         interfaces.add(newInterface);
+
         this.data.put("interfaces", interfaces);
         return this;
     }

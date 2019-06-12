@@ -340,7 +340,7 @@ public class GraphQLSchemaGeneratorTest {
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Cause_UserIdCause")
                 .kind("OBJECT")
-                .interfaces("INTERFACE", "hudson_model_Action", null)
+                .interfaces("INTERFACE", "hudson_model_Cause", null)
                 .fields("{\"name\":\"shortDescription\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
                 .fields("{\"name\":\"userId\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
                 .fields("{\"name\":\"userName\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
