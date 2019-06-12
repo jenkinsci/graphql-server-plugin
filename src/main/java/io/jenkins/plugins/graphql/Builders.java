@@ -22,6 +22,7 @@ import graphql.schema.GraphQLTypeReference;
 import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
 import hudson.model.Action;
+import hudson.model.Descriptor;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
@@ -216,6 +217,14 @@ public class Builders {
         Model<?> model = MODEL_BUILDER.get(clazz);
 
         GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
+
+        if (Jenkins.getInstanceOrNull() != null) {
+            Descriptor descriptor = Jenkins.getInstanceOrNull().getDescriptor(clazz);
+            if (descriptor != null) {
+                typeBuilder.description(descriptor.getDisplayName());
+            }
+        }
+
         typeBuilder
             .name(ClassUtils.getGraphQLClassName(clazz))
             .field(makeClassFieldDefinition());

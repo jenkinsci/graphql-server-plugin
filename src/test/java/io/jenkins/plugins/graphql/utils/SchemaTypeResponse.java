@@ -13,12 +13,12 @@ public class SchemaTypeResponse {
 
     private SchemaTypeResponse() {
         this.data.putAll(new Gson().fromJson("{\n" +
-            "    \"inputFields\": {},\n" +
-            "    \"interfaces\": {},\n" +
-            "    \"possibleTypes\": {},\n" +
+            "    \"inputFields\": null,\n" +
+            "    \"interfaces\": null,\n" +
+            "    \"possibleTypes\": null,\n" +
             "    \"kind\": \"Object\",\n" +
             "    \"name\": \"\",\n" +
-            "    \"description\": {},\n" +
+            "    \"description\": null,\n" +
             "    \"fields\": [\n" +
             "      {\n" +
             "        \"name\": \"_class\",\n" +
@@ -27,13 +27,13 @@ public class SchemaTypeResponse {
             "        \"type\": {\n" +
             "          \"kind\": \"SCALAR\",\n" +
             "          \"name\": \"String\",\n" +
-            "          \"ofType\": {}\n" +
+            "          \"ofType\": null\n" +
             "        },\n" +
             "        \"isDeprecated\": false,\n" +
-            "        \"deprecationReason\": {}\n" +
+            "        \"deprecationReason\": null\n" +
             "      }\n" +
             "    ],\n" +
-            "    \"enumValues\": {}\n" +
+            "    \"enumValues\": null\n" +
             "  }\n", new TypeToken<HashMap<String, Object>>() {}.getType()));
     }
 

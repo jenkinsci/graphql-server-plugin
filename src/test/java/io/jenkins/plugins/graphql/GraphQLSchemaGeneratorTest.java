@@ -1,6 +1,7 @@
 package io.jenkins.plugins.graphql;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
 import com.mashape.unirest.http.HttpResponse;
@@ -19,8 +20,12 @@ import hudson.model.FreeStyleProject;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.User;
+import hudson.scheduler.Hash;
 import hudson.security.csrf.CrumbIssuer;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
+import org.hamcrest.Matcher;
+import org.hamcrest.Matchers;
+import org.hamcrest.core.AllOf;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
@@ -31,19 +36,16 @@ import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.*;
 
 public class GraphQLSchemaGeneratorTest {
     @Rule
@@ -201,9 +203,9 @@ public class GraphQLSchemaGeneratorTest {
         );
         JSONObject whoamiData = data.getJSONObject("whoAmI");
 
-        assertEquals(
-            "anonymous",
-            whoamiData.getJSONArray("authorities").getString(0)
+        assertArrayEquals(
+            new String[] { "anonymous" },
+            Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
         );
         assertEquals(
             null,
@@ -221,6 +223,9 @@ public class GraphQLSchemaGeneratorTest {
 
     @Test
     public void whoamiAuth() throws UnirestException {
+        JenkinsRule.DummySecurityRealm dummySecurityRealm = j.createDummySecurityRealm();
+        j.jenkins.setSecurityRealm(dummySecurityRealm);
+
         JSONObject data = postQuery(
             "alice",
             "alice",
@@ -229,20 +234,20 @@ public class GraphQLSchemaGeneratorTest {
 
         JSONObject whoamiData = data.getJSONObject("whoAmI");
 
-        assertEquals(
-            "anonymous",
-            whoamiData.getJSONArray("authorities").getString(0)
+        assertArrayEquals(
+            new String[] { "authenticated" },
+            Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
         );
         assertEquals(
-            null,
+            "org.acegisecurity.ui.WebAuthenticationDetails@957e: RemoteIpAddress: 127.0.0.1; SessionId: null",
             whoamiData.optString("details", null)
         );
         assertEquals(
-            true,
+            false,
             whoamiData.getBoolean("anonymous")
         );
         assertEquals(
-            "anonymous",
+            "alice",
             whoamiData.getString("name")
         );
     }
@@ -282,20 +287,31 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executionResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
         System.out.println(graphQLSchema.getTypeMap().keySet());
 
-        assertEquals(
+        HashMap<String, ?> actionType = getSchemaType(executionResult, "hudson_model_Action");
+        assertNotNull(actionType);
+        HashMap<String, ?> __actionType = getSchemaType(executionResult, "__hudson_model_Action");
+        assertNotNull(__actionType);
+        HashMap<String, ?> causeActionType = getSchemaType(executionResult, "hudson_model_CauseAction");
+        assertNotNull(causeActionType);
+        HashMap<String, ?> causeUserIdActionType = getSchemaType(executionResult, "hudson_model_Cause_UserIdCause");
+        assertNotNull(causeUserIdActionType);
+
+
+        assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Action")
                 .kind("INTERFACE")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\":{}}")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\":{}}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersDefinitionProperty\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_security_WhoAmI\", \"ofType\": null}")
                 .toHashMap(),
-            getSchemaType(executionResult, "hudson_model_Action")
+            actionType
         );
 
-        assertEquals(
+        assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("__hudson_model_Action")
                 .description("Generic implementation of Action with just _class defined")
@@ -303,64 +319,80 @@ public class GraphQLSchemaGeneratorTest {
                 .interfaces("{\n" +
                     "        \"kind\": \"INTERFACE\",\n" +
                     "        \"name\": \"hudson_model_Action\",\n" +
-                    "        \"ofType\": {}\n" +
+                    "        \"ofType\": null\n" +
                     "      }\n")
                 .toHashMap(),
-            new Gson().fromJson(
-                new Gson().toJson(getSchemaType(executionResult, "__hudson_model_Action")),
-                HashMap.class
-            )
+            __actionType
         );
 
-        assertEquals(
+        assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_CauseAction")
                 .kind("OBJECT")
                 .interfaces("{\n" +
                     "        \"kind\": \"INTERFACE\",\n" +
                     "        \"name\": \"hudson_model_Action\",\n" +
-                    "        \"ofType\": {}\n" +
+                    "        \"ofType\": null\n" +
                     "      }\n")
-                .fields("{\"name\":\"causes\",\"description\":{},\"args\":["+
-                        "{\"name\":\"id\", \"description\":{}, \"type\":{\"kind\":\"SCALAR\", \"name\":\"ID\", \"ofType\":{}}, \"defaultValue\":{}},"+
-                        "{\"name\":\"limit\", \"description\":{}, type={\"kind\":\"SCALAR\", \"name\":\"Int\", \"ofType\":{}}, \"defaultValue\":\"100\"},"+
-                        "{\"name\":\"offset\", \"description\":{}, \"type\":{\"kind\":SCALAR, \"name\":\"Int\", \"ofType\":{}}, \"defaultValue\":\"0\"},"+
-                        "{\"name\":\"type\", \"description\":{}, \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"defaultValue\":{}}"+
-                    "],\"type\":{\"kind\":\"LIST\",\"name\":{},\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\":{}}},\"isDeprecated\":false,\"deprecationReason\":{}}")
+                .fields("{\"name\":\"causes\",\"description\":null,\"args\":["+
+                        "{\"name\":\"id\", \"description\":null, \"type\":{\"kind\":\"SCALAR\", \"name\":\"ID\", \"ofType\": null}, \"defaultValue\":null},"+
+                        "{\"name\":\"limit\", \"description\":null, type={\"kind\":\"SCALAR\", \"name\":\"Int\", \"ofType\": null}, \"defaultValue\":\"100\"},"+
+                        "{\"name\":\"offset\", \"description\":null, \"type\":{\"kind\":SCALAR, \"name\":\"Int\", \"ofType\": null}, \"defaultValue\":\"0\"},"+
+                        "{\"name\":\"type\", \"description\":null, \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"defaultValue\":null}"+
+                    "],\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\": null}},\"isDeprecated\":false,\"deprecationReason\":null}")
                 .toHashMap(),
-            new Gson().fromJson(
-                new Gson().toJson(getSchemaType(executionResult, "hudson_model_CauseAction")),
-                HashMap.class
-            )
+            causeActionType
         );
 
-        assertEquals(
+        assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Cause_UserIdCause")
                 .kind("OBJECT")
                 .interfaces("{\n" +
                     "        \"kind\": \"INTERFACE\",\n" +
                     "        \"name\": \"hudson_model_Cause\",\n" +
-                    "        \"ofType\": {}\n" +
+                    "        \"ofType\": null\n" +
                     "      }\n")
-                .fields("{\"name\":\"shortDescription\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
-                .fields("{\"name\":\"userId\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
-                .fields("{\"name\":\"userName\", \"description\":{}, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\":{}}, \"isDeprecated\": false, \"deprecationReason\":{}}")
+                .fields("{\"name\":\"shortDescription\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
+                .fields("{\"name\":\"userId\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
+                .fields("{\"name\":\"userName\", \"description\":null, \"args\":[], \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"isDeprecated\": false, \"deprecationReason\":null}")
                 .toHashMap(),
-            new Gson().fromJson(
-                new Gson().toJson(getSchemaType(executionResult, "hudson_model_Cause_UserIdCause")),
-                HashMap.class
-            )
+            causeUserIdActionType
         );
-        assertTrue(true);
     }
 
-    private Object getSchemaType(ExecutionResult executionResult, String typeName) {
+    private void assertSchemaType(HashMap expected, HashMap actual) {
+        String[] fields = new String[] { "inputFields", "interfaces", "possibleTypes", "kind", "name", "description", "fields", "enumValues" };
+        for (String field : fields) {
+            assertEquals(expected.get("name") + "'s " + field + " needs to match up", expected.get(field), actual.get(field));
+        }
+
+//            "    \"fields\": [\n" +
+//            "      {\n" +
+//            "        \"name\": \"_class\",\n" +
+//            "        \"description\": \"Class Name\",\n" +
+//            "        \"args\": [],\n" +
+//            "        \"type\": {\n" +
+//            "          \"kind\": \"SCALAR\",\n" +
+//            "          \"name\": \"String\",\n" +
+//            "          \"ofType\": null\n" +
+//            "        },\n" +
+//            "        \"isDeprecated\": false,\n" +
+//            "        \"deprecationReason\": null\n" +
+//            "      }\n" +
+//            "    ],\n" +
+    }
+
+    private HashMap<String, ?> getSchemaType(ExecutionResult executionResult, String typeName) {
         Map data = executionResult.getData();
         Map schema = (Map) data.get("__schema");
         List types = (List) schema.get("types");
-        return types.stream().filter(
-            type -> ((Map) type).get("name").equals(typeName)
-        ).toArray()[0];
+        for (Object type : types) {
+            HashMap typeMap = (HashMap) type;
+            if (typeMap.get("name").equals(typeName)) {
+                return typeMap;
+            }
+        }
+        return null;
     }
 }
