@@ -72,14 +72,17 @@ public class ClassUtils {
         return name;
     }
 
-    @VisibleForTesting
-    public static Set<Class> _getAllClassesCache = null;
+    private static Set<Class> _getAllClassesCache = null;
 
+    @VisibleForTesting
+    public static void setAllClassesCache(Set<Class> data) {
+        synchronized (_getAllClassesCache) {
+            _getAllClassesCache = data;
+        }
+    }
     private static Set<Class> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
-        synchronized (_getAllClassesCache) {
-            _getAllClassesCache = new HashSet<>();
-        }
+        setAllClassesCache(new HashSet<>());
 
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());

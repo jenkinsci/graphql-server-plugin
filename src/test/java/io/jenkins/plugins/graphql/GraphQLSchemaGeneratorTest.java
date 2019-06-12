@@ -63,7 +63,7 @@ public class GraphQLSchemaGeneratorTest {
     @Before
     public void setup() {
 
-        ClassUtils._getAllClassesCache = MockClassUtils.mock_getAllClassesList();
+        ClassUtils.setAllClassesCache(MockClassUtils.mock_getAllClassesList());
 
         Builders builder = new Builders();
         builder.addExtraTopLevelClasses(Collections.singletonList(FreeStyleProject.class));
