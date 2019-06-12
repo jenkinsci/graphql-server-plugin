@@ -53,6 +53,7 @@ import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -382,8 +383,8 @@ public class Builders {
             @Override
             public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                 Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-                String name = ClassUtils.getGraphQLClassName(realClazz);
-                LOGGER.info("Attempting to find: " + name);
+                String name = ClassUtils.getGraphQLClassName(realClazz);;
+                LOGGER.log(Level.INFO, "Attempting to find: {0}", name);
                 if (env.getSchema().getObjectType(name) != null) {
                     return env.getSchema().getObjectType(name);
                 }
@@ -400,7 +401,7 @@ public class Builders {
 //                    .collect(Collectors.toList());
                 for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
                     name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
-                    LOGGER.info(MessageFormat.format("Attempting to find subclass: {0}", name));
+                    LOGGER.log(Level.INFO, "Attempting to find subclass: {0}", name);
                     GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                     if (objectType != null) {
                         return objectType;
@@ -408,7 +409,7 @@ public class Builders {
                 }
                 for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
                     name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
-                    LOGGER.info("Attempting to find interface: " + name);
+                    LOGGER.log(Level.INFO, "Attempting to find interface: {0}", name);
                     GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                     if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
                         return objectType;
