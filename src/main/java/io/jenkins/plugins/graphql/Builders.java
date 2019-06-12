@@ -87,11 +87,6 @@ public class Builders {
 
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
-    /*package*/ private static final Set<Class> INTERFACES = new HashSet<>(Arrays.asList(
-        Job.class,
-        RunWithSCM.class
-    ));
-
     static {
         javaTypesToGraphqlTypes.put("boolean", Scalars.GraphQLBoolean);
         javaTypesToGraphqlTypes.put(Boolean.class.getSimpleName(), Scalars.GraphQLBoolean);
@@ -137,7 +132,7 @@ public class Builders {
     /*** DONE STATIC */
     private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
     private HashMap<String, GraphQLObjectType.Builder> mockGraphQLTypes = new HashMap();
-    private HashSet<Class> interfaces = new HashSet(INTERFACES);
+    private HashSet<Class> interfaces = new HashSet();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
