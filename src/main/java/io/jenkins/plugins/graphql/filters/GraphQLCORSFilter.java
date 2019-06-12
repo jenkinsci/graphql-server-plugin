@@ -25,11 +25,14 @@ public class GraphQLCORSFilter implements Filter {
 
     @Initializer(after = InitMilestone.JOB_LOADED)
     public static void init() throws ServletException {
-        Injector inj = Jenkins.getInstanceOrNull().getInjector();
-        if (inj == null) {
-            return;
+        Jenkins instance = Jenkins.getInstanceOrNull();
+        if (instance != null) {
+            Injector inj = instance.getInjector();
+            if (inj == null) {
+                return;
+            }
+            PluginServletFilter.addFilter(inj.getInstance(GraphQLCORSFilter.class));
         }
-        PluginServletFilter.addFilter(inj.getInstance(GraphQLCORSFilter.class));
     }
 
     @Override

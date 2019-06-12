@@ -82,10 +82,13 @@ public class ClassUtils {
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
         classLoadersList.add(ClasspathHelper.staticClassLoader());
-        if (Jenkins.getInstanceOrNull() != null) {
+        Jenkins instance = Jenkins.getInstanceOrNull();
+        if (instance != null) {
             classLoadersList.addAll(
-                Jenkins.getInstanceOrNull().getPluginManager().getPlugins().stream()
-                    .map(i -> i.classLoader).collect(Collectors.toList())
+                instance.getPluginManager().getPlugins()
+                    .stream()
+                    .map(i -> i.classLoader)
+                    .collect(Collectors.toList())
             );
         }
 
