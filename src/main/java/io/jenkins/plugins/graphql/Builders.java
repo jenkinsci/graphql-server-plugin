@@ -427,10 +427,10 @@ public class Builders {
         return interfaceType.build();
     }
 
-    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> clazz) {
+    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz) {
         return GraphQLFieldDefinition.newFieldDefinition()
-            .name("all" + clazz.getSimpleName() + "s")
-            .type(GraphQLList.list(createSchemaClassName(clazz)))
+            .name("all" + defaultClazz.getSimpleName() + "s")
+            .type(GraphQLList.list(createSchemaClassName(defaultClazz)))
             .argument(GraphQLArgument.newArgument()
                 .name(ARG_OFFSET)
                 .type(Scalars.GraphQLInt)
@@ -456,7 +456,7 @@ public class Builders {
 
                 @Override
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                    Class _clazz = clazz;
+                    Class clazz = defaultClazz;
                     Jenkins instance = Jenkins.getInstanceOrNull();
                     int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
                     int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
@@ -464,11 +464,11 @@ public class Builders {
                     String id = dataFetchingEnvironment.getArgument(ARG_ID);
 
                     if (clazzName != null && !clazzName.isEmpty()) {
-                        _clazz = Class.forName(clazzName);
+                        clazz = Class.forName(clazzName);
                     }
 
                     Iterable iterable;
-                    if (_clazz == User.class) {
+                    if (clazz == User.class) {
                         if (id != null && !id.isEmpty()) {
                             return Stream.of(User.get(id, false, Collections.emptyMap()))
                                 .filter(Objects::nonNull)
@@ -489,7 +489,7 @@ public class Builders {
                         iterable = Items.allItems(
                             Jenkins.getAuthentication(),
                             Jenkins.getInstanceOrNull(),
-                            _clazz
+                            clazz
                         );
                     }
                     return Lists.newArrayList(slice(iterable, offset, limit));
