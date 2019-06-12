@@ -37,7 +37,6 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -61,6 +60,11 @@ import java.util.stream.Stream;
 public class Builders {
     private static final Logger LOGGER = Logger.getLogger(Builders.class.getName());
     private static final ModelBuilder MODEL_BUILDER = new ModelBuilder();
+
+    private static final String ARG_OFFSET = "offset";
+    private static final String ARG_LIMIT = "limit";
+    private static final String ARG_TYPE = "type";
+    private static final String ARG_ID = "id";
 
     private static GraphQLFieldDefinition makeClassFieldDefinition() {
         return GraphQLFieldDefinition.newFieldDefinition()
@@ -260,9 +264,9 @@ public class Builders {
 
                 if (className instanceof GraphQLList) {
                     fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
-                        int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
-                        int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                        String id = dataFetchingEnvironment.getArgument("id");
+                        int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
+                        int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
+                        String id = dataFetchingEnvironment.getArgument(ARG_ID);
 
                         List<?> valuesList;
                         Object values = p.getValue(dataFetchingEnvironment.getSource());
@@ -291,21 +295,21 @@ public class Builders {
                         return Lists.newArrayList(Iterators.limit(iterator, limit));
                     });
                     fieldBuilder.argument(GraphQLArgument.newArgument()
-                            .name("offset")
+                            .name(ARG_OFFSET)
                             .type(Scalars.GraphQLInt)
                             .defaultValue(0)
                         )
                         .argument(GraphQLArgument.newArgument()
-                            .name("limit")
+                            .name(ARG_LIMIT)
                             .type(Scalars.GraphQLInt)
                             .defaultValue(100)
                         )
                         .argument(GraphQLArgument.newArgument()
-                            .name("type")
+                            .name(ARG_TYPE)
                             .type(Scalars.GraphQLString)
                         )
                         .argument(GraphQLArgument.newArgument()
-                            .name("id")
+                            .name(ARG_ID)
                             .type(Scalars.GraphQLID)
                         );
                 }
@@ -330,8 +334,7 @@ public class Builders {
 
         while (!classQueue.isEmpty()) {
             Class clazz = classQueue.poll();
-            if (clazz == Object.class) { continue; }
-            if (clazz == Class.class) { continue; }
+            if (clazz == Object.class || clazz == Class.class) { continue; }
             this.buildSchemaFromClass(clazz);
         }
 
@@ -383,7 +386,7 @@ public class Builders {
             @Override
             public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                 Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-                String name = ClassUtils.getGraphQLClassName(realClazz);;
+                String name = ClassUtils.getGraphQLClassName(realClazz);
                 LOGGER.log(Level.INFO, "Attempting to find: {0}", name);
                 if (env.getSchema().getObjectType(name) != null) {
                     return env.getSchema().getObjectType(name);
@@ -438,21 +441,21 @@ public class Builders {
             .name("all" + clazz.getSimpleName() + "s")
             .type(GraphQLList.list(createSchemaClassName(clazz)))
             .argument(GraphQLArgument.newArgument()
-                .name("offset")
+                .name(ARG_OFFSET)
                 .type(Scalars.GraphQLInt)
                 .defaultValue(0)
             )
             .argument(GraphQLArgument.newArgument()
-                .name("limit")
+                .name(ARG_LIMIT)
                 .type(Scalars.GraphQLInt)
                 .defaultValue(100)
             )
             .argument(GraphQLArgument.newArgument()
-                .name("type")
+                .name(ARG_TYPE)
                 .type(Scalars.GraphQLString)
             )
             .argument(GraphQLArgument.newArgument()
-                .name("id")
+                .name(ARG_ID)
                 .type(Scalars.GraphQLID)
             )
             .dataFetcher(new DataFetcher<Object>() {
@@ -464,10 +467,10 @@ public class Builders {
                 public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
                     Class _clazz = clazz;
                     Jenkins instance = Jenkins.getInstanceOrNull();
-                    int offset = dataFetchingEnvironment.<Integer>getArgument("offset");
-                    int limit = dataFetchingEnvironment.<Integer>getArgument("limit");
-                    String clazzName = dataFetchingEnvironment.getArgument("type");
-                    String id = dataFetchingEnvironment.getArgument("id");
+                    int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
+                    int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
+                    String clazzName = dataFetchingEnvironment.getArgument(ARG_TYPE);
+                    String id = dataFetchingEnvironment.getArgument(ARG_ID);
 
                     if (clazzName != null && !clazzName.isEmpty()) {
                         _clazz = Class.forName(clazzName);
@@ -484,7 +487,8 @@ public class Builders {
                     } else {
                         if (id != null && !id.isEmpty()) {
                             if (instance == null) {
-                                throw new RuntimeException("Should never actually be null");
+                                LOGGER.log(Level.SEVERE, "Jenkins.getInstanceOrNull() is null, panic panic die die");
+                                return null;
                             }
                             return Stream.of(instance.getItemByFullName(id))
                                 .filter(Objects::nonNull)
