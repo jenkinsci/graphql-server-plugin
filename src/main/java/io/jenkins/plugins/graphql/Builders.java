@@ -87,6 +87,11 @@ public class Builders {
         .build());
     }
 
+    private static Iterator<?> slice(Iterable<?> base, int start, int limit) {
+        return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
+    }
+
+
     private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
 
     static {
@@ -285,8 +290,7 @@ public class Builders {
                             return null;
                         }
 
-                        Iterator<?> iterator = Iterables.skip(valuesList, offset).iterator();
-                        return Lists.newArrayList(Iterators.limit(iterator, limit));
+                        return Lists.newArrayList(slice(valuesList, offset, limit));
                     });
                     fieldBuilder.argument(GraphQLArgument.newArgument()
                             .name(ARG_OFFSET)
@@ -449,51 +453,44 @@ public class Builders {
                 .name(ARG_ID)
                 .type(Scalars.GraphQLID)
             )
-            .dataFetcher(new DataFetcher<Object>() {
-                public Iterator<?> slice(Iterable<?> base, int start, int limit) {
-                    return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
+            .dataFetcher(dataFetchingEnvironment -> {
+                Class clazz = defaultClazz;
+                Jenkins instance = Jenkins.getInstanceOrNull();
+                int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
+                int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
+                String clazzName = dataFetchingEnvironment.getArgument(ARG_TYPE);
+                String id = dataFetchingEnvironment.getArgument(ARG_ID);
+
+                if (clazzName != null && !clazzName.isEmpty()) {
+                    clazz = Class.forName(clazzName);
                 }
 
-                @Override
-                public Object get(DataFetchingEnvironment dataFetchingEnvironment) throws Exception {
-                    Class clazz = defaultClazz;
-                    Jenkins instance = Jenkins.getInstanceOrNull();
-                    int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
-                    int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
-                    String clazzName = dataFetchingEnvironment.getArgument(ARG_TYPE);
-                    String id = dataFetchingEnvironment.getArgument(ARG_ID);
-
-                    if (clazzName != null && !clazzName.isEmpty()) {
-                        clazz = Class.forName(clazzName);
+                Iterable iterable;
+                if (clazz == User.class) {
+                    if (id != null && !id.isEmpty()) {
+                        return Stream.of(User.get(id, false, Collections.emptyMap()))
+                            .filter(Objects::nonNull)
+                            .toArray();
+                    }
+                    iterable = User.getAll();
+                } else {
+                    if (id != null && !id.isEmpty()) {
+                        if (instance == null) {
+                            LOGGER.log(Level.SEVERE, "Jenkins.getInstanceOrNull() is null, panic panic die die");
+                            return null;
+                        }
+                        return Stream.of(instance.getItemByFullName(id))
+                            .filter(Objects::nonNull)
+                            .toArray();
                     }
 
-                    Iterable iterable;
-                    if (clazz == User.class) {
-                        if (id != null && !id.isEmpty()) {
-                            return Stream.of(User.get(id, false, Collections.emptyMap()))
-                                .filter(Objects::nonNull)
-                                .toArray();
-                        }
-                        iterable = User.getAll();
-                    } else {
-                        if (id != null && !id.isEmpty()) {
-                            if (instance == null) {
-                                LOGGER.log(Level.SEVERE, "Jenkins.getInstanceOrNull() is null, panic panic die die");
-                                return null;
-                            }
-                            return Stream.of(instance.getItemByFullName(id))
-                                .filter(Objects::nonNull)
-                                .toArray();
-                        }
-
-                        iterable = Items.allItems(
-                            Jenkins.getAuthentication(),
-                            Jenkins.getInstanceOrNull(),
-                            clazz
-                        );
-                    }
-                    return Lists.newArrayList(slice(iterable, offset, limit));
+                    iterable = Items.allItems(
+                        Jenkins.getAuthentication(),
+                        Jenkins.getInstanceOrNull(),
+                        clazz
+                    );
                 }
+                return Lists.newArrayList(slice(iterable, offset, limit));
             });
     }
 
