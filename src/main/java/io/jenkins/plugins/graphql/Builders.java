@@ -353,7 +353,7 @@ public class Builders {
         for (Class<?> interfaceClazz : interfaces) {
             for (Map.Entry<Class, GraphQLObjectType.Builder> instanceClazz : this.graphQLTypes.entrySet()) {
                 if (interfaceClazz != instanceClazz.getKey() && interfaceClazz.isAssignableFrom(instanceClazz.getKey())) {
-                    this.graphQLTypes.get(instanceClazz).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
+                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
                 }
             }
         }

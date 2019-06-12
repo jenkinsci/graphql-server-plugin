@@ -75,10 +75,8 @@ public class ClassUtils {
     private static Set<Class> _getAllClassesCache = null;
 
     @VisibleForTesting
-    public static void setAllClassesCache(Set<Class> data) {
-        synchronized (_getAllClassesCache) {
-            _getAllClassesCache = data;
-        }
+    public static synchronized  void setAllClassesCache(Set<Class> data) {
+        _getAllClassesCache = data;
     }
     private static Set<Class> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
