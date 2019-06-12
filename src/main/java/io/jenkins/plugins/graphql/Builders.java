@@ -399,11 +399,11 @@ public class Builders {
                 // find where name == graphqlname(class)
                 // fall through to the __ one
                 // maybe, cause that only checks the impls that match the subclass exactly
-                List<GraphQLType> impls = env.getSchema().getTypeMap()
-                    .values()
-                    .stream()
-                    .filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType()))
-                    .collect(Collectors.toList());
+//                List<GraphQLType> impls = env.getSchema().getTypeMap()
+//                    .values()
+//                    .stream()
+//                    .filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType()))
+//                    .collect(Collectors.toList());
                 for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
                     name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
                     LOGGER.info("Attempting to find subclass: " + name);
