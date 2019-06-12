@@ -5,8 +5,6 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
 import graphql.scalars.ExtendedScalars;
-import graphql.schema.DataFetcher;
-import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLCodeRegistry;
 import graphql.schema.GraphQLDirective;
