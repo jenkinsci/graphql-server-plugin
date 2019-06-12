@@ -4,7 +4,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import graphql.Scalars;
-import graphql.TypeResolutionEnvironment;
 import graphql.scalars.ExtendedScalars;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
@@ -202,15 +201,10 @@ public class Builders {
     }
 
     static boolean shouldIgnoreClass(Class clazz) {
-        if (clazz.isAnnotationPresent(NoExternalUse.class)) {
-            return true;
-        }
-        if (clazz.isAnonymousClass()) {
-            return true;
-        }
-        return false;
+        return clazz.isAnnotationPresent(NoExternalUse.class) || clazz.isAnonymousClass();
     }
 
+    @SuppressWarnings("squid:S135")
     GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
 
         Model<?> model = MODEL_BUILDER.get(clazz);
@@ -382,44 +376,41 @@ public class Builders {
     }
 
     private TypeResolver buildTypeResolver() {
-        return new TypeResolver() {
-            @Override
-            public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-                String name = ClassUtils.getGraphQLClassName(realClazz);
-                LOGGER.log(Level.INFO, "Attempting to find: {0}", name);
-                if (env.getSchema().getObjectType(name) != null) {
-                    return env.getSchema().getObjectType(name);
-                }
+        return env -> {
+            Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
+            String name = ClassUtils.getGraphQLClassName(realClazz);
+            LOGGER.log(Level.INFO, "Attempting to find: {0}", name);
+            if (env.getSchema().getObjectType(name) != null) {
+                return env.getSchema().getObjectType(name);
+            }
 
-                // FIXME - I think i started this earlier to find the right impl, but then forgot about it
-                // should probably ignore ones starting with __
-                // find where name == graphqlname(class)
-                // fall through to the __ one
-                // maybe, cause that only checks the impls that match the subclass exactly
+            // FIXME - I think i started this earlier to find the right impl, but then forgot about it
+            // should probably ignore ones starting with __
+            // find where name == graphqlname(class)
+            // fall through to the __ one
+            // maybe, cause that only checks the impls that match the subclass exactly
 //                List<GraphQLType> impls = env.getSchema().getTypeMap()
 //                    .values()
 //                    .stream()
 //                    .filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType()))
 //                    .collect(Collectors.toList());
-                for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
-                    name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
-                    LOGGER.log(Level.INFO, "Attempting to find subclass: {0}", name);
-                    GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                    if (objectType != null) {
-                        return objectType;
-                    }
+            for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
+                name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
+                LOGGER.log(Level.INFO, "Attempting to find subclass: {0}", name);
+                GraphQLObjectType objectType = env.getSchema().getObjectType(name);
+                if (objectType != null) {
+                    return objectType;
                 }
-                for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
-                    name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
-                    LOGGER.log(Level.INFO, "Attempting to find interface: {0}", name);
-                    GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                    if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
-                        return objectType;
-                    }
-                }
-                return null;
             }
+            for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
+                name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
+                LOGGER.log(Level.INFO, "Attempting to find interface: {0}", name);
+                GraphQLObjectType objectType = env.getSchema().getObjectType(name);
+                if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
+                    return objectType;
+                }
+            }
+            return null;
         };
     }
 
