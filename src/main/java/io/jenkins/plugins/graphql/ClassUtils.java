@@ -77,7 +77,9 @@ public class ClassUtils {
 
     private static Set<Class> _getAllClasses() {
         if (_getAllClassesCache != null) { return _getAllClassesCache; }
-        _getAllClassesCache = new HashSet<>();
+        synchronized (_getAllClassesCache) {
+            _getAllClassesCache = new HashSet<>();
+        }
 
         List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
