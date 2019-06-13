@@ -11,6 +11,7 @@ import org.reflections8.util.ConfigurationBuilder;
 import org.reflections8.util.FilterBuilder;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Vector;
 import java.util.logging.Logger;
 
@@ -23,6 +24,8 @@ import java.util.stream.Collectors;
 public class ClassUtils {
     private static final Logger LOGGER = Logger.getLogger(ClassUtils.class.getName());
     static final String ENHANCER = "$MockitoMock$";
+
+    private ClassUtils() {}
 
     public static Set<Class<?>> getAllInterfaces(Class<?> instance) {
         Set<Class<?>> interfaces = new HashSet<>();
@@ -45,8 +48,7 @@ public class ClassUtils {
         }
         return superclasses;
     }
-
-
+    
     public static Class<?> getRealClass(Class<?> clazz) {
         Class<?> type = clazz;
         while(type.getSimpleName().contains(ClassUtils.ENHANCER)) {
@@ -55,34 +57,24 @@ public class ClassUtils {
         return type;
     }
 
-    // FIXME - memoize
     public static String getGraphQLClassName(Class<?> clazz) {
         clazz = getRealClass(clazz);
         String name = clazz.getName().replaceAll("\\$[0-9]+$", "");
-//        String name = clazz.getSimpleName();
-//        if (name.isEmpty()) {
-//            String[] parts = clazz.getName().replaceAll("\\$[0-9]+$", "").split("\\.");
-//            for (int partNum = parts.length - 1; partNum > 0; partNum--) {
-//                name = parts[partNum];
-//                if (!name.isEmpty()) { break; }
-//            }
-//        }
         name = name.replaceAll("[^_0-9A-Za-z]", "_");
-//        assert(name.isEmpty());
         return name;
     }
 
-    private static Set<Class> _getAllClassesCache = null;
+    private static Set<Class> getAllClassesCache = null;
 
     @VisibleForTesting
     public static synchronized  void setAllClassesCache(Set<Class> data) {
-        _getAllClassesCache = data;
+        getAllClassesCache = data;
     }
-    private static Set<Class> _getAllClasses() {
-        if (_getAllClassesCache != null) { return _getAllClassesCache; }
+    private static Set<Class> getAllClasses() {
+        if (getAllClassesCache != null) { return getAllClassesCache; }
         setAllClassesCache(new HashSet<>());
 
-        List<ClassLoader> classLoadersList = new LinkedList<ClassLoader>();
+        List<ClassLoader> classLoadersList = new LinkedList<>();
         classLoadersList.add(ClasspathHelper.contextClassLoader());
         classLoadersList.add(ClasspathHelper.staticClassLoader());
         Jenkins instance = Jenkins.getInstanceOrNull();
@@ -100,10 +92,10 @@ public class ClassUtils {
             boolean oldAccessible = f.isAccessible();
             f.setAccessible(true);
             for (ClassLoader classLoader : classLoadersList) {
-                Vector<Class> classes =  new Vector<>(
+                ArrayList<Class> classes =  new ArrayList<>(
                     (Vector<Class>) f.get(classLoader)
                 );
-                _getAllClassesCache.addAll(
+                getAllClassesCache.addAll(
                     classes
                         .stream()
                         .filter( clazz -> clazz.getName().toLowerCase().contains("jenkins") || clazz.getName().toLowerCase().contains("hudson"))
@@ -143,23 +135,19 @@ public class ClassUtils {
         );
 
         _getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
-        LOGGER.info(
-            _getAllClassesCache.stream().filter(i -> i.getName().contains("WorkflowRun")).collect(Collectors.toList()).toString()
-        );
-        LOGGER.info(
-            _getAllClassesCache.stream().filter(i -> i.getName().contains("CauseAction")).collect(Collectors.toList()).toString()
-        );
         return _getAllClassesCache;
     }
 
-    public static Set<Class> findSubclasses(ModelBuilder MODEL_BUILDER, Class interfaceClass) {
+    public static Set<Class> findSubclasses(ModelBuilder modelBuilder, Class interfaceClass) {
         Set<Class> subClasses = new HashSet<>();
-        for (Class clazz : _getAllClasses()) {
+        for (Class clazz : getAllClasses()) {
             if (interfaceClass.isAssignableFrom(clazz)) {
                 try {
-                    MODEL_BUILDER.get(clazz);
+                    modelBuilder.get(clazz);
                     subClasses.add(clazz);
                 } catch (org.kohsuke.stapler.export.NotExportableException e) {
+                    // there's no model/export data
+                    // so skip this class
                 }
             }
         }
