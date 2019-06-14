@@ -23,6 +23,8 @@ import hudson.model.Descriptor;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
+import hudson.security.AccessControlled;
+import hudson.security.Permission;
 import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
@@ -488,7 +490,17 @@ public class Builders {
                         clazz
                     );
                 }
-                return Lists.newArrayList(slice(iterable, offset, limit));
+                return Lists.newArrayList(slice(iterable, offset, limit))
+                    .stream()
+                    .filter(i -> {
+                        if (i instanceof AccessControlled) {
+                            return ((AccessControlled) i).hasPermission(Permission.READ);
+                        }
+                        // not something that has access control rules, so can't see it
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+
             });
     }
 
