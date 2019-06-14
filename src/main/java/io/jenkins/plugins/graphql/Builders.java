@@ -284,13 +284,18 @@ public class Builders {
 
                                 String objectId = String.valueOf(method.invoke(value));
                                 if (id.equals(objectId)) {
-                                    return Stream.of(value).toArray();
+                                    return Stream.of(value)
+                                        .filter(StreamUtils::isAllowed)
+                                        .toArray();
                                 }
                             }
                             return null;
                         }
 
-                        return Lists.newArrayList(slice(valuesList, offset, limit));
+                        return Lists.newArrayList(slice(valuesList, offset, limit))
+                            .stream()
+                            .filter(StreamUtils::isAllowed)
+                            .toArray();
                     });
                     fieldBuilder.argument(GraphQLArgument.newArgument()
                             .name(ARG_OFFSET)
@@ -470,6 +475,7 @@ public class Builders {
                     if (id != null && !id.isEmpty()) {
                         return Stream.of(User.get(id, false, Collections.emptyMap()))
                             .filter(Objects::nonNull)
+                            .filter(StreamUtils::isAllowed)
                             .toArray();
                     }
                     iterable = User.getAll();
@@ -481,6 +487,7 @@ public class Builders {
                         }
                         return Stream.of(instance.getItemByFullName(id))
                             .filter(Objects::nonNull)
+                            .filter(StreamUtils::isAllowed)
                             .toArray();
                     }
 
@@ -492,15 +499,8 @@ public class Builders {
                 }
                 return Lists.newArrayList(slice(iterable, offset, limit))
                     .stream()
-                    .filter(i -> {
-                        if (i instanceof AccessControlled) {
-                            return ((AccessControlled) i).hasPermission(Permission.READ);
-                        }
-                        // not something that has access control rules, so can't see it
-                        return false;
-                    })
-                    .collect(Collectors.toList());
-
+                    .filter(StreamUtils::isAllowed)
+                    .toArray();
             });
     }
 
