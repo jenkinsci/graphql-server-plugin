@@ -134,8 +134,8 @@ public class ClassUtils {
             )
         );
 
-        _getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
-        return _getAllClassesCache;
+        getAllClassesCache.addAll(reflections.getSubTypesOf(Object.class));
+        return getAllClassesCache;
     }
 
     public static Set<Class> findSubclasses(ModelBuilder modelBuilder, Class interfaceClass) {
