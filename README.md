@@ -101,6 +101,14 @@ query {
       _class
     }
   }
+  whoAmI {
+    anonymous
+    authenticated
+    authorities
+    details
+    name
+    toString
+  }
 }
 ```
 
