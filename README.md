@@ -1,5 +1,7 @@
 # Graphql Server Plugin
 
+[![Build Status](https://ci.jenkins.io/buildStatus/icon??style=plastic&job=Plugins%2Fgraphql-server-plugin%2Fmaster)](https://ci.jenkins.io/job/Plugins/job/graphql-server-plugin/job/master/)
+
 A graphql implementation for jenkins.
 
 ## WARNING: This is currently a work in progress
