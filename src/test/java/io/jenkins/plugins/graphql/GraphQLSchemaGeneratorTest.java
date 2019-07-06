@@ -20,12 +20,11 @@ import hudson.model.FreeStyleProject;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.User;
-import hudson.scheduler.Hash;
 import hudson.security.csrf.CrumbIssuer;
+import io.jenkins.plugins.graphql.utils.JsonMapFlattener;
+import io.jenkins.plugins.graphql.utils.SchemaFieldBuilder;
+import io.jenkins.plugins.graphql.utils.SchemaTypeBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
-import org.hamcrest.Matcher;
-import org.hamcrest.Matchers;
-import org.hamcrest.core.AllOf;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
@@ -36,16 +35,18 @@ import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class GraphQLSchemaGeneratorTest {
     @Rule
@@ -321,17 +322,24 @@ public class GraphQLSchemaGeneratorTest {
             __actionType
         );
 
+//        fields:
+//        Expected :[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}, {args=[{defaultValue=0, name=type, description=null, type={inputFields=null, interfaces=null, possibleTypes=null, kind=Object, name=String, description=null, fields=[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}], enumValues=null}}, {defaultValue=0, name=offset, description=null, type={inputFields=null, interfaces=null, possibleTypes=null, kind=Object, name=Int, description=null, fields=[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}], enumValues=null}}, {defaultValue=0, name=limit, description=null, type={inputFields=null, interfaces=null, possibleTypes=null, kind=Object, name=Int, description=null, fields=[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}], enumValues=null}}, {defaultValue=0, name=id, description=null, type={inputFields=null, interfaces=null, possibleTypes=null, kind=Object, name=Int, description=null, fields=[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}], enumValues=null}}], deprecationReason=null, isDeprecated=false, name=causes, description=null, type={kind=LIST, name=null, ofType={inputFields=null, interfaces=null, possibleTypes=null, kind=INTERFACE, name=hudson_model_Cause, description=null, fields=[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}], enumValues=null}}}]
+//        Actual   :[{name=_class, description=Class Name, args=[], type={kind=SCALAR, name=String, ofType=null}, isDeprecated=false, deprecationReason=null}, {name=causes, description=null, args=[{name=offset, description=null, type={kind=SCALAR, name=Int, ofType=null}, defaultValue=0}, {name=limit, description=null, type={kind=SCALAR, name=Int, ofType=null}, defaultValue=100}, {name=type, description=null, type={kind=SCALAR, name=String, ofType=null}, defaultValue=null}, {name=id, description=null, type={kind=SCALAR, name=ID, ofType=null}, defaultValue=null}], type={kind=LIST, name=null, ofType={kind=INTERFACE, name=hudson_model_Cause, ofType=null}}, isDeprecated=false, deprecationReason=null}]
         assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_CauseAction")
                 .kind("OBJECT")
                 .interfaces("INTERFACE", "hudson_model_Action", null)
-                .fields("{\"name\":\"causes\",\"description\":null,\"args\":["+
-                        "{\"name\":\"id\", \"description\":null, \"type\":{\"kind\":\"SCALAR\", \"name\":\"ID\", \"ofType\": null}, \"defaultValue\":null},"+
-                        "{\"name\":\"limit\", \"description\":null, type={\"kind\":\"SCALAR\", \"name\":\"Int\", \"ofType\": null}, \"defaultValue\":\"100\"},"+
-                        "{\"name\":\"offset\", \"description\":null, \"type\":{\"kind\":SCALAR, \"name\":\"Int\", \"ofType\": null}, \"defaultValue\":\"0\"},"+
-                        "{\"name\":\"type\", \"description\":null, \"type\":{\"kind\":\"SCALAR\", \"name\":\"String\", \"ofType\": null}, \"defaultValue\":null}"+
-                    "],\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"INTERFACE\",\"name\":\"hudson_model_Cause\",\"ofType\": null}},\"isDeprecated\":false,\"deprecationReason\":null}")
+                .fields(
+                    SchemaFieldBuilder.newFieldBuilder()
+                        .name("causes")
+                        .args("offset",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
+                        .args("limit",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
+                        .args("type",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("String").toHashMap())
+                        .args("id",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
+                        .type("LIST",null, SchemaTypeBuilder.newTypeBuilder().kind("INTERFACE").name("hudson_model_Cause").toHashMap())
+                        .toHashMap()
+                )
                 .toHashMap(),
             causeActionType
         );
@@ -349,32 +357,19 @@ public class GraphQLSchemaGeneratorTest {
         );
     }
 
-    private void assertSchemaType(HashMap expected, HashMap actual) {
-        String[] fields = new String[] { "inputFields", "interfaces", "possibleTypes", "kind", "name", "description", "fields", "enumValues" };
-        for (String field : fields) {
-            assertEquals(expected.get("name") + "'s " + field + " needs to match up", expected.get(field), actual.get(field));
-        }
+    private void assertSchemaType(Map expected, Map actual) {
+        Map expectedFlattened = JsonMapFlattener.flatten(expected);
+        Map actualFlattened = JsonMapFlattener.flatten(actual);
 
-//            "    \"fields\": [\n" +
-//            "      {\n" +
-//            "        \"name\": \"_class\",\n" +
-//            "        \"description\": \"Class Name\",\n" +
-//            "        \"args\": [],\n" +
-//            "        \"type\": {\n" +
-//            "          \"kind\": \"SCALAR\",\n" +
-//            "          \"name\": \"String\",\n" +
-//            "          \"ofType\": null\n" +
-//            "        },\n" +
-//            "        \"isDeprecated\": false,\n" +
-//            "        \"deprecationReason\": null\n" +
-//            "      }\n" +
-//            "    ],\n" +
+        for (Object key : expectedFlattened.entrySet()) {
+            assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
+        }
     }
 
     private HashMap<String, ?> getSchemaType(ExecutionResult executionResult, String typeName) {
         Map data = executionResult.getData();
         Map schema = (Map) data.get("__schema");
-        List types = (List) schema.get("types");
+        Set types = new HashSet<>((List) schema.get("types"));
         for (Object type : types) {
             HashMap typeMap = (HashMap) type;
             if (typeMap.get("name").equals(typeName)) {

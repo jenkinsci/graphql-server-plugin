@@ -23,8 +23,6 @@ import hudson.model.Descriptor;
 import hudson.model.Items;
 import hudson.model.Job;
 import hudson.model.User;
-import hudson.security.AccessControlled;
-import hudson.security.Permission;
 import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;

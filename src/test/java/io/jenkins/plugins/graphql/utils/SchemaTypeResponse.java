@@ -3,10 +3,10 @@ package io.jenkins.plugins.graphql.utils;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.reflect.TypeToken;
-import io.jenkins.plugins.graphql.GraphQLSchemaGeneratorTest;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 public class SchemaTypeResponse {
     private final HashMap<String, Object> data = new HashMap<>();
@@ -34,7 +34,8 @@ public class SchemaTypeResponse {
             "      }\n" +
             "    ],\n" +
             "    \"enumValues\": null\n" +
-            "  }\n", new TypeToken<HashMap<String, Object>>() {}.getType()));
+            "  }\n", new TypeToken<HashMap<String, Object>>() {
+        }.getType()));
     }
 
     static public SchemaTypeResponse newSchemaTypeResponse() {
@@ -63,7 +64,7 @@ public class SchemaTypeResponse {
     public SchemaTypeResponse possibleTypes(String json) {
         ArrayList<Object> possibleTypes = new ArrayList<>();
         if (this.data.get("possibleTypes") instanceof ArrayList) {
-            possibleTypes = (ArrayList<Object>) this.data.get("possibleTypes");
+            possibleTypes = (ArrayList) this.data.get("possibleTypes");
         }
         possibleTypes.add(new Gson().fromJson(json, HashMap.class));
         this.data.put("possibleTypes", possibleTypes);
@@ -73,7 +74,7 @@ public class SchemaTypeResponse {
     public SchemaTypeResponse interfaces(String kind, String name, String ofType) {
         ArrayList<Object> interfaces = new ArrayList<>();
         if (this.data.get("interfaces") instanceof ArrayList) {
-            interfaces = (ArrayList<Object>) this.data.get("interfaces");
+            interfaces = (ArrayList) this.data.get("interfaces");
         }
         HashMap<String, Object> newInterface = new HashMap<>();
         newInterface.put("kind", kind);
@@ -87,11 +88,16 @@ public class SchemaTypeResponse {
     }
 
     public SchemaTypeResponse fields(String json) {
+        this.fields(new Gson().fromJson(json, LinkedTreeMap.class));
+        return this;
+    }
+
+    public SchemaTypeResponse fields(Map field) {
         ArrayList<Object> fields = new ArrayList<>();
         if (this.data.get("fields") instanceof ArrayList) {
-            fields = (ArrayList<Object>) this.data.get("fields");
+            fields = (ArrayList) this.data.get("fields");
         }
-        fields.add(new Gson().fromJson(json, LinkedTreeMap.class));
+        fields.add(field);
         this.data.put("fields", fields);
         return this;
     }
