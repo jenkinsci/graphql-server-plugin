@@ -187,15 +187,15 @@ public class Builders {
 
             interfaces.add(clazz);
             mockGraphQLTypes.put(
-                "__" + ClassUtils.getGraphQLClassName(clazz),
+                ClassUtils.getGraphQLClassName(clazz) + "__",
                 GraphQLObjectType.newObject()
-                    .name("__" + ClassUtils.getGraphQLClassName(clazz))
+                    .name(ClassUtils.getGraphQLClassName(clazz) + "__")
                     .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
                     .field(makeClassFieldDefinition())
                     .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
-            makeClassIdDefintion(clazz, mockGraphQLTypes.get("__" + ClassUtils.getGraphQLClassName(clazz)));
+            makeClassIdDefintion(clazz, mockGraphQLTypes.get(ClassUtils.getGraphQLClassName(clazz) + "__"));
 
             graphQLTypes.put(clazz, fieldBuilder);
             return;
@@ -402,7 +402,7 @@ public class Builders {
 //                    .filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType()))
 //                    .collect(Collectors.toList());
             for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
-                name = "__" + ClassUtils.getGraphQLClassName(subclassClazz);
+                name = ClassUtils.getGraphQLClassName(subclassClazz) + "__";
                 LOGGER.log(Level.INFO, "Attempting to find subclass: {0}", name);
                 GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                 if (objectType != null) {
@@ -410,7 +410,7 @@ public class Builders {
                 }
             }
             for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
-                name = "__" + ClassUtils.getGraphQLClassName(interfaceClazz);
+                name = ClassUtils.getGraphQLClassName(interfaceClazz) + "__";
                 LOGGER.log(Level.INFO, "Attempting to find interface: {0}", name);
                 GraphQLObjectType objectType = env.getSchema().getObjectType(name);
                 if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
