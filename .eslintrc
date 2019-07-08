@@ -97,7 +97,7 @@
     "id-match": [2, "^(?:_?[a-zA-Z0-9]*)|[_A-Z0-9]+$"],
     "indent": 0,
     "init-declarations": 0,
-    "linebreak-style": 2,
+    "linebreak-style": [0, "unix"],
     "lines-around-comment": 0,
     "max-depth": 0,
     "max-nested-callbacks": 0,
