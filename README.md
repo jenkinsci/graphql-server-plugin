@@ -19,7 +19,7 @@ A graphql implementation for jenkins.
 * [X] Fix index.jelly for description of plugin (good enough for release though)
 - [ ] Log info for `"message": "Can't resolve '/allUsers[0]/property[1]'. Abstract type 'hudson_model_UserProperty' must resolve to an Object type at runtime for field 'null.property'. Could not determine the exact type of 'hudson_model_UserProperty'"` (and fix problem)
 - [ ] Fix `Name "__hudson_model_Action" must not begin with "__", which is reserved by GraphQL introspection. In a future release of graphql this will become a hard error.`
-- [ ] Add https://github.com/OneGraph/graphiql-explorer (so rewrite ui with react/maven-frontend)
+- [X] Add https://github.com/OneGraph/graphiql-explorer (so rewrite ui with react/maven-frontend)
 
 ## "Feature Complete" query
 
