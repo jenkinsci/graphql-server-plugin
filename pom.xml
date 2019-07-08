@@ -149,6 +149,16 @@
                         <phase>generate-resources</phase>
                     </execution>
                     <execution>
+                        <id>npm install</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>install</arguments>
+                        </configuration>
+                        <phase>generate-resources</phase>
+                    </execution>
+                    <execution>
                         <id>npm run lint</id>
                         <goals>
                             <goal>npm</goal>
@@ -156,6 +166,7 @@
                         <configuration>
                             <arguments>run lint</arguments>
                         </configuration>
+                        <phase>generate-resources</phase>
                     </execution>
                     <execution>
                         <id>npm run build</id>
@@ -165,6 +176,7 @@
                         <configuration>
                             <arguments>run build</arguments>
                         </configuration>
+                        <phase>generate-resources</phase>
                     </execution>
                 </executions>
                 <configuration>
