@@ -45,3 +45,12 @@ work/
 *.iml
 .idea
 logging.properties
+node_modules/
+dist/
+cache/
+src/main/webapp/js/script.js
+src/main/webapp/js/script.js.map
+src/main/webapp/js/script.css
+src/main/webapp/js/script.css.map
+.cache/
+node/

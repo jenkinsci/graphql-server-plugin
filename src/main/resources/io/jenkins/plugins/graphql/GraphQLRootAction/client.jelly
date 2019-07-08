@@ -17,10 +17,8 @@
             <meta name="ROBOTS" content="INDEX,NOFOLLOW" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <title>GraphQL Playground</title>
-            <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/css/index.css" />
-            <link rel="shortcut icon" href="//cdn.jsdelivr.net/npm/graphql-playground-react/build/favicon.png" />
-            <script src="//cdn.jsdelivr.net/npm/graphql-playground-react/build/static/js/middleware.js"></script>
             <script>window.rootURL = "${rootURL}"</script>
+            <link rel="stylesheet" href="${rootURL}/plugin/graphql-server/js/script.css" />
         </head>
         <body>
             <style>
@@ -29,15 +27,8 @@
                 }
             </style>
 
-            <script src="//cdn.jsdelivr.net/es6-promise/4.0.5/es6-promise.auto.min.js"></script>
-            <script src="//cdn.jsdelivr.net/fetch/0.9.0/fetch.min.js"></script>
-            <script src="//cdn.jsdelivr.net/react/15.4.2/react.min.js"></script>
-            <script src="//cdn.jsdelivr.net/react/15.4.2/react-dom.min.js"></script>
-            <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/graphiql@0.11.11/graphiql.css" />
-            <script src="//cdn.jsdelivr.net/npm/graphiql@0.11.11/graphiql.js"></script>
-
             <div id="graphiql">Loading...</div>
-            <script src="${rootURL}/plugin/graphql-server/js/graphiql.js"></script>
+            <script src="${rootURL}/plugin/graphql-server/js/script.js"></script>
         </body>
     </html>
 </j:jelly>
