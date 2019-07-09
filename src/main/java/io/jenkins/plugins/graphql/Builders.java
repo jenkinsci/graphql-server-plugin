@@ -325,7 +325,7 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        queryType.field(buildAllQuery(AbstractItem.class));
+        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
         queryType.field(buildAllQuery(User.class));
         queryType.field(buildActionQuery(WhoAmI.class));
 
@@ -437,8 +437,12 @@ public class Builders {
     }
 
     public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz) {
+        return buildAllQuery(defaultClazz, "all" + defaultClazz.getSimpleName() + "s");
+    }
+
+    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz, String fieldName) {
         return GraphQLFieldDefinition.newFieldDefinition()
-            .name("all" + defaultClazz.getSimpleName() + "s")
+            .name(fieldName)
             .type(GraphQLList.list(createSchemaClassName(defaultClazz)))
             .argument(GraphQLArgument.newArgument()
                 .name(ARG_OFFSET)

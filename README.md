@@ -9,8 +9,8 @@ A graphql implementation for jenkins.
 ## "Feature Complete" query
 
 ```
-query allJobs {
-  allAbstractItems {
+query allItems {
+  allItems {
     name
     id
     _class
