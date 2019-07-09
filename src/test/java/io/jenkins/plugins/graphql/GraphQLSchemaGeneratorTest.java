@@ -290,7 +290,7 @@ public class GraphQLSchemaGeneratorTest {
 
         HashMap<String, ?> actionType = getSchemaType(executionResult, "hudson_model_Action");
         assertNotNull(actionType);
-        HashMap<String, ?> __actionType = getSchemaType(executionResult, "__hudson_model_Action");
+        HashMap<String, ?> __actionType = getSchemaType(executionResult, "hudson_model_Action__");
         assertNotNull(__actionType);
         HashMap<String, ?> causeActionType = getSchemaType(executionResult, "hudson_model_CauseAction");
         assertNotNull(causeActionType);
@@ -302,7 +302,7 @@ public class GraphQLSchemaGeneratorTest {
             SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Action")
                 .kind("INTERFACE")
-                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"__hudson_model_Action\", \"ofType\": null}")
+                .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_Action__\", \"ofType\": null}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_CauseAction\", \"ofType\": null}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_MyViewsProperty\", \"ofType\": null}")
                 .possibleTypes("{\"kind\":\"OBJECT\", \"name\":\"hudson_model_ParametersAction\", \"ofType\": null}")
@@ -314,7 +314,7 @@ public class GraphQLSchemaGeneratorTest {
 
         assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
-                .name("__hudson_model_Action")
+                .name("hudson_model_Action__")
                 .description("Generic implementation of Action with just _class defined")
                 .kind("OBJECT")
                 .interfaces("INTERFACE", "hudson_model_Action", null)
