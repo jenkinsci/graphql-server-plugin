@@ -93,7 +93,7 @@ public class GraphQLSchemaGeneratorTest {
     public void actions() throws IOException {
         FreeStyleProject freeStyleProject = j.createFreeStyleProject();
 
-        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("hudson_model_Job");
+        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_Job");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
@@ -108,7 +108,7 @@ public class GraphQLSchemaGeneratorTest {
         j.createFreeStyleProject("two");
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput()
-            .query("query { allJobs(id: \"one\") { _class\nname } }")
+            .query("query { allItems(id: \"one\") { _class\nname } }")
             .build();
         ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
         if (executeResult.getErrors().size() != 0) {
@@ -116,7 +116,7 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            new Gson().fromJson("{\"allJobs\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}", Map.class),
+            new Gson().fromJson("{\"allItems\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}", Map.class),
             executeResult.getData()
         );
     }
@@ -127,7 +127,7 @@ public class GraphQLSchemaGeneratorTest {
         j.createFreeStyleProject("two");
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput()
-            .query("query { allJobs(id: \"nonexistant\") { _class\nname } }")
+            .query("query { allItems(id: \"nonexistant\") { _class\nname } }")
             .build();
         ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
         if (executeResult.getErrors().size() != 0) {
@@ -135,7 +135,7 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            new Gson().fromJson("{\"allJobs\":[ ]}", Map.class),
+            new Gson().fromJson("{\"allItems\":[ ]}", Map.class),
             executeResult.getData()
         );
     }
