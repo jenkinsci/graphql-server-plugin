@@ -18,6 +18,7 @@ import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
 import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
+import hudson.model.AbstractItem;
 import hudson.model.Action;
 import hudson.model.Descriptor;
 import hudson.model.Items;
@@ -324,10 +325,11 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        queryType.field(buildAllQuery(Job.class));
+        queryType.field(buildAllQuery(AbstractItem.class));
         queryType.field(buildAllQuery(User.class));
         queryType.field(buildActionQuery(WhoAmI.class));
 
+        classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
         classQueue.addAll(this.interfaces);
