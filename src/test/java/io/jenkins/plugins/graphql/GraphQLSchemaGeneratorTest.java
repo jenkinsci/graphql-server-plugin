@@ -12,7 +12,6 @@ import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
@@ -27,6 +26,7 @@ import io.jenkins.plugins.graphql.utils.SchemaTypeBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
 import org.json.JSONObject;
 import org.junit.Before;
+import org.junit.ComparisonFailure;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -333,10 +333,10 @@ public class GraphQLSchemaGeneratorTest {
                 .fields(
                     SchemaFieldBuilder.newFieldBuilder()
                         .name("causes")
-                        .args("offset",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
-                        .args("limit",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
-                        .args("type",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("String").toHashMap())
-                        .args("id",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
+                        .args("offset",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").kind("SCALAR").toHashMap())
+                        .args("limit",null,"100",SchemaTypeResponse.newSchemaTypeResponse().name("Int").kind("SCALAR").toHashMap())
+                        .args("type",null,null,SchemaTypeResponse.newSchemaTypeResponse().name("String").kind("SCALAR").toHashMap())
+                        .args("id",null,null,SchemaTypeResponse.newSchemaTypeResponse().name("ID").kind("SCALAR").toHashMap())
                         .type("LIST",null, SchemaTypeBuilder.newTypeBuilder().kind("INTERFACE").name("hudson_model_Cause").toHashMap())
                         .toHashMap()
                 )
@@ -361,8 +361,14 @@ public class GraphQLSchemaGeneratorTest {
         Map expectedFlattened = JsonMapFlattener.flatten(expected);
         Map actualFlattened = JsonMapFlattener.flatten(actual);
 
+
         for (Object key : expectedFlattened.keySet()) {
-            assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
+            try {
+                assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
+            } catch (ComparisonFailure e) {
+                e.printStackTrace();
+                assertEquals(expectedFlattened, actualFlattened);
+            }
         }
     }
 

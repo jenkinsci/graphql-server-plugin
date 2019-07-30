@@ -54,6 +54,10 @@ public class SchemaTypeResponse {
 
     public SchemaTypeResponse kind(String anInterface) {
         this.data.put("kind", anInterface.toUpperCase());
+        if (anInterface.toUpperCase() == "SCALAR") {
+            ArrayList<Object> fields = new ArrayList<>();
+            this.data.put("fields", null);
+        }
         return this;
     }
 
