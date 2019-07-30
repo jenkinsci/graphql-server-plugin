@@ -314,6 +314,19 @@ public class GraphQLSchemaGeneratorTest {
 
         assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
+                .name("hudson_model_FreeStyleProject")
+                .kind("OBJECT")
+                .description("Freestyle project")
+                .interfaces("INTERFACE", "hudson_model_AbstractProject", null)
+                .interfaces("INTERFACE", "hudson_model_Job", null)
+                .interfaces("INTERFACE", "hudson_model_AbstractItem", null)
+                .interfaces("INTERFACE", "hudson_model_Project", null)
+                .toHashMap(),
+            getSchemaType(executionResult, "hudson_model_FreeStyleProject")
+        );
+
+        assertSchemaType(
+            SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Action__")
                 .description("Generic implementation of Action with just _class defined")
                 .kind("OBJECT")

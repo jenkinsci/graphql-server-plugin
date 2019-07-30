@@ -178,9 +178,14 @@ public class Builders {
             return;
         }
 
+        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
         try {
             MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
+            isInterface = true;
+        }
+
+        if (isInterface) {
             GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
             fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz))
                 .field(makeClassFieldDefinition());
