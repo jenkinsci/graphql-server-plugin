@@ -361,7 +361,7 @@ public class GraphQLSchemaGeneratorTest {
         Map expectedFlattened = JsonMapFlattener.flatten(expected);
         Map actualFlattened = JsonMapFlattener.flatten(actual);
 
-        for (Object key : expectedFlattened.entrySet()) {
+        for (Object key : expectedFlattened.keySet()) {
             assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
         }
     }
