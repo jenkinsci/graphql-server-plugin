@@ -16,6 +16,7 @@ import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
+import graphql.schema.GraphqlTypeBuilder;
 import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
 import hudson.model.AbstractItem;
@@ -73,7 +74,7 @@ public class Builders {
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
     }
-    private static void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
+    private static void makeClassIdDefintion(Class<?> clazz, GraphqlTypeBuilderWrapper fieldBuilder) {
         final Method idMethod = IdFinder.idMethod(clazz);
         if (idMethod == null) {
             return;
@@ -136,9 +137,8 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
+    private HashMap<Class, GraphqlTypeBuilderWrapper> graphQLTypes = new HashMap();
     private HashMap<String, GraphQLObjectType.Builder> mockGraphQLTypes = new HashMap();
-    private HashSet<Class> interfaces = new HashSet();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
@@ -149,12 +149,11 @@ public class Builders {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
 
+        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
+
         // interfaces are never exported, so handle them seperately
-        if (Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
-            if (!interfaces.contains(clazz)) {
-                interfaces.add(clazz);
-                classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
-            }
+        if (isInterface) {
+            classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
         } else {
             try {
                 MODEL_BUILDER.get(clazz);
@@ -186,12 +185,13 @@ public class Builders {
         }
 
         if (isInterface) {
-            GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz))
-                .field(makeClassFieldDefinition());
+            GraphqlTypeBuilderWrapper fieldBuilder = new GraphqlTypeBuilderWrapper(
+                isInterface ? GraphQLInterfaceType.newInterface() : GraphQLObjectType.newObject()
+            );
+            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz));
+            fieldBuilder.field(makeClassFieldDefinition());
             makeClassIdDefintion(clazz, fieldBuilder);
 
-            interfaces.add(clazz);
             mockGraphQLTypes.put(
                 ClassUtils.getGraphQLClassName(clazz) + "__",
                 GraphQLObjectType.newObject()
@@ -201,7 +201,10 @@ public class Builders {
                     .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
 
             );
-            makeClassIdDefintion(clazz, mockGraphQLTypes.get(ClassUtils.getGraphQLClassName(clazz) + "__"));
+            makeClassIdDefintion(
+                clazz,
+                new GraphqlTypeBuilderWrapper(mockGraphQLTypes.get(ClassUtils.getGraphQLClassName(clazz) + "__"))
+            );
 
             graphQLTypes.put(clazz, fieldBuilder);
             return;
@@ -214,11 +217,14 @@ public class Builders {
     }
 
     @SuppressWarnings("squid:S135")
-    GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
+    GraphqlTypeBuilderWrapper buildGraphQLTypeFromModel(Class clazz) {
+        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
 
         Model<?> model = MODEL_BUILDER.get(clazz);
 
-        GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
+        GraphqlTypeBuilderWrapper typeBuilder = new GraphqlTypeBuilderWrapper(
+            isInterface ? GraphQLInterfaceType.newInterface() : GraphQLObjectType.newObject()
+        );
 
         Jenkins instance = Jenkins.getInstanceOrNull();
         if (instance != null) {
@@ -228,9 +234,9 @@ public class Builders {
             }
         }
 
-        typeBuilder
-            .name(ClassUtils.getGraphQLClassName(clazz))
-            .field(makeClassFieldDefinition());
+        typeBuilder.name(ClassUtils.getGraphQLClassName(clazz));
+
+        typeBuilder.field(makeClassFieldDefinition());
         makeClassIdDefintion(clazz, typeBuilder);
 
         ArrayList<Model<?>> queue = new ArrayList<>();
@@ -320,7 +326,7 @@ public class Builders {
                             .type(Scalars.GraphQLID)
                         );
                 }
-                typeBuilder = typeBuilder.field(fieldBuilder.build());
+                typeBuilder.field(fieldBuilder.build());
             }
         }
         return typeBuilder;
@@ -337,7 +343,6 @@ public class Builders {
         classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
-        classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
         while (!classQueue.isEmpty()) {
@@ -349,26 +354,37 @@ public class Builders {
         HashSet<GraphQLType> types = new HashSet<>();
         GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
-        for (Class clazz : interfaces) {
-            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz).build());
-            types.add(interfaceType);
-            LOGGER.info("Interface:" + interfaceType.getName());
-            codeRegistry.typeResolver(interfaceType.getName(), buildTypeResolver());
+        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
+            if (!interfaceClazz.getValue().isInterface()) {
+                continue;
+            }
+            LOGGER.info("Interface:" + interfaceClazz.getValue().getName());
+            codeRegistry.typeResolver(interfaceClazz.getValue().getName(), buildTypeResolver());
         }
 
-        for (Class<?> interfaceClazz : interfaces) {
-            for (Map.Entry<Class, GraphQLObjectType.Builder> instanceClazz : this.graphQLTypes.entrySet()) {
-                if (interfaceClazz != instanceClazz.getKey() && interfaceClazz.isAssignableFrom(instanceClazz.getKey())) {
-                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
+        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
+            if (!interfaceClazz.getValue().isInterface()) {
+                continue;
+            }
+            for (Map.Entry<Class, GraphqlTypeBuilderWrapper> instanceClazz : this.graphQLTypes.entrySet()) {
+                if (instanceClazz.getValue().isInterface()) {
+                    continue;
+                }
+                if (interfaceClazz.getKey() != instanceClazz.getKey() && interfaceClazz.getKey().isAssignableFrom(instanceClazz.getKey())) {
+                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz.getKey())));
                 }
             }
         }
 
         types.addAll(
-            Stream.concat(
-                this.mockGraphQLTypes.values().stream(),
-                this.graphQLTypes.values().stream()
-            )
+            this.graphQLTypes.values().stream()
+                .map(i -> i.build())
+                // .filter(distinctByKey(GraphQLObjectType::getName))
+                .collect(Collectors.toList())
+        );
+
+        types.addAll(
+            this.mockGraphQLTypes.values().stream()
                 .map(GraphQLObjectType.Builder::build)
                 .filter(distinctByKey(GraphQLObjectType::getName))
                 .collect(Collectors.toList())
@@ -376,7 +392,6 @@ public class Builders {
 
         this.graphQLTypes = null;
         this.mockGraphQLTypes = null;
-        this.interfaces = null;
         this.classQueue = null;
         this.extraTopLevelClasses = null;
 

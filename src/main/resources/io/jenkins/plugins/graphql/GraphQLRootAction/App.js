@@ -1,4 +1,4 @@
-// @flow
+/* eslint no-console: 0 */
 // Borrowed from https://github.com/OneGraph/graphiql-explorer-example
 import React, { Component } from "react";
 import "whatwg-fetch";
@@ -16,7 +16,6 @@ import type { GraphQLSchema } from "graphql";
 function fetcher(params: Object): Object {
   return fetch(
     `${window.rootURL}/graphql/`,
-    // "https://graphql-jenkins.g4v.dev/graphql/",
     {
       method: "POST",
       headers: {
