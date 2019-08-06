@@ -1,6 +1,6 @@
 # Graphql Server Plugin
 
-[![Build Status](https://ci.jenkins.io/buildStatus/icon??style=plastic&job=Plugins%2Fgraphql-server-plugin%2Fmaster)](https://ci.jenkins.io/job/Plugins/job/graphql-server-plugin/job/master/)
+[![Build Status](https://ci.jenkins.io/buildStatus/icon?style=plastic&job=Plugins%2Fgraphql-server-plugin%2Fmaster)](https://ci.jenkins.io/job/Plugins/job/graphql-server-plugin/job/master/)
 
 A graphql implementation for jenkins.
 
@@ -9,73 +9,73 @@ A graphql implementation for jenkins.
 ## "Feature Complete" query
 
 ```
-query {
-  allJobs {
+query allItems {
+  allItems {
     name
     id
     _class
     actions {
       _class
     }
-    allBuilds {
-      _class
-      id
-      actions {
+    description
+    displayName
+    fullDisplayName
+    url
+    ... on hudson_model_Job {
+      allBuilds {
         _class
-        ... on hudson_tasks_junit_TestResultAction {
+        id
+        actions {
           _class
-          failCount
-          skipCount
-          totalCount
-          urlName
-        }
-        ... on hudson_model_CauseAction {
-          causes {
+          ... on hudson_tasks_junit_TestResultAction {
             _class
-            shortDescription
-            ... on hudson_model_Cause_UserIdCause {
-              userId
-              userName
+            failCount
+            skipCount
+            totalCount
+            urlName
+          }
+          ... on hudson_model_CauseAction {
+            causes {
+              _class
+              shortDescription
+              ... on hudson_model_Cause_UserIdCause {
+                userId
+                userName
+              }
             }
           }
         }
-      }
-      artifacts {
-        _class
-        displayPath
-        fileName
-        relativePath
-      }
-      building
-      description
-      displayName
-      duration
-      estimatedDuration
-      executor {
-        _class
-        currentExecutable {
+        artifacts {
           _class
+          displayPath
+          fileName
+          relativePath
         }
-        idle
-        likelyStuck
+        building
+        duration
+        estimatedDuration
+        executor {
+          _class
+          currentExecutable {
+            _class
+          }
+          idle
+          likelyStuck
+          number
+          progress
+        }
+        fingerprint {
+          _class
+          fileName
+          hash
+          timestamp
+        }
+        keepLog
         number
-        progress
-      }
-      fingerprint {
-        _class
-        fileName
-        hash
-        # original: BuildPtr
+        queueId
+        result
         timestamp
-        # usage: [RangeItem]
       }
-      fullDisplayName
-      keepLog
-      number
-      queueId
-      result
-      timestamp
-      url
     }
   }
   allUsers {

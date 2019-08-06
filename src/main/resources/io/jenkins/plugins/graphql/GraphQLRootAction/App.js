@@ -1,4 +1,4 @@
-// @flow
+/* eslint no-console: 0 */
 // Borrowed from https://github.com/OneGraph/graphiql-explorer-example
 import React, { Component } from "react";
 import "whatwg-fetch";
@@ -16,7 +16,6 @@ import type { GraphQLSchema } from "graphql";
 function fetcher(params: Object): Object {
   return fetch(
     `${window.rootURL}/graphql/`,
-    // "https://graphql-jenkins.g4v.dev/graphql/",
     {
       method: "POST",
       headers: {
@@ -40,73 +39,73 @@ function fetcher(params: Object): Object {
 
 const DEFAULT_QUERY = `# shift-option/alt-click on a query below to jump to it in the explorer
 # option/alt-click on a field in the explorer to select all subfields
-query allJobs {
-  allJobs {
+query allItems {
+  allItems {
     name
     id
     _class
     actions {
       _class
     }
-    allBuilds {
-      _class
-      id
-      actions {
+    description
+    displayName
+    fullDisplayName
+    url
+    ... on hudson_model_Job {
+      allBuilds {
         _class
-        ... on hudson_tasks_junit_TestResultAction {
+        id
+        actions {
           _class
-          failCount
-          skipCount
-          totalCount
-          urlName
-        }
-        ... on hudson_model_CauseAction {
-          causes {
+          ... on hudson_tasks_junit_TestResultAction {
             _class
-            shortDescription
-            ... on hudson_model_Cause_UserIdCause {
-              userId
-              userName
+            failCount
+            skipCount
+            totalCount
+            urlName
+          }
+          ... on hudson_model_CauseAction {
+            causes {
+              _class
+              shortDescription
+              ... on hudson_model_Cause_UserIdCause {
+                userId
+                userName
+              }
             }
           }
         }
-      }
-      artifacts {
-        _class
-        displayPath
-        fileName
-        relativePath
-      }
-      building
-      description
-      displayName
-      duration
-      estimatedDuration
-      executor {
-        _class
-        currentExecutable {
+        artifacts {
           _class
+          displayPath
+          fileName
+          relativePath
         }
-        idle
-        likelyStuck
+        building
+        duration
+        estimatedDuration
+        executor {
+          _class
+          currentExecutable {
+            _class
+          }
+          idle
+          likelyStuck
+          number
+          progress
+        }
+        fingerprint {
+          _class
+          fileName
+          hash
+          timestamp
+        }
+        keepLog
         number
-        progress
-      }
-      fingerprint {
-        _class
-        fileName
-        hash
-        # original: BuildPtr
+        queueId
+        result
         timestamp
-        # usage: [RangeItem]
       }
-      fullDisplayName
-      keepLog
-      number
-      queueId
-      result
-      timestamp
-      url
     }
   }
   allUsers {

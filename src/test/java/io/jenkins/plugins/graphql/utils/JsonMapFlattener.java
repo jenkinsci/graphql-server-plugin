@@ -19,10 +19,14 @@ From https://github.com/spring-projects/spring-vault/blob/b390aab875e4c4062406fd
  * limitations under the License.
  */
 
+import com.google.common.collect.Lists;
 import org.springframework.util.Assert;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -94,8 +98,12 @@ public abstract class JsonMapFlattener {
 
         Map<String, String> resultMap = new LinkedHashMap<>();
 
-        doFlatten("", inputMap.entrySet().iterator(), resultMap, it -> it == null ? null
-            : it.toString());
+        doFlatten(
+            "",
+            inputMap.entrySet().iterator(),
+            resultMap,
+            it -> it == null ? null : it.toString()
+        );
 
         return resultMap;
     }
@@ -112,8 +120,12 @@ public abstract class JsonMapFlattener {
         while (inputMap.hasNext()) {
 
             Entry<String, ? extends Object> entry = inputMap.next();
-            flattenElement(propertyPrefix.concat(entry.getKey()), entry.getValue(),
-                resultMap, valueTransformer);
+            flattenElement(
+                propertyPrefix.concat(entry.getKey()),
+                entry.getValue(),
+                resultMap,
+                valueTransformer
+            );
         }
     }
 
@@ -122,14 +134,22 @@ public abstract class JsonMapFlattener {
                                        Map<String, ?> resultMap, Function<Object, Object> valueTransformer) {
 
         if (source instanceof Iterable) {
-            flattenCollection(propertyPrefix, (Iterable<Object>) source, resultMap,
-                valueTransformer);
+            flattenCollection(
+                propertyPrefix,
+                (Iterable<Object>) source,
+                resultMap,
+                valueTransformer
+            );
             return;
         }
 
         if (source instanceof Map) {
-            doFlatten(propertyPrefix, ((Map<String, ?>) source).entrySet().iterator(),
-                resultMap, valueTransformer);
+            doFlatten(
+                propertyPrefix,
+                ((Map<String, ?>) source).entrySet().iterator(),
+                resultMap,
+                valueTransformer
+            );
             return;
         }
 
@@ -140,11 +160,30 @@ public abstract class JsonMapFlattener {
                                           Iterable<Object> iterable, Map<String, ?> resultMap,
                                           Function<Object, Object> valueTransformer) {
 
+        List list = Lists.newArrayList(iterable);
+        Collections.sort(list, new Comparator<Object>() {
+            @Override
+            public int compare(Object o1, Object o2) {
+                if (o1 instanceof Map && o2 instanceof Map) {
+                    String o1Name = (String) ((Map) o1).get("name");
+                    String o2Name = (String) ((Map) o2).get("name");
+                    if (o1Name != null && o2Name != null) {
+                        return o1Name.compareTo(o2Name);
+                    }
+                }
+                return o1.toString().compareTo(o2.toString());
+            }
+        });
+
         int counter = 0;
 
-        for (Object element : iterable) {
-            flattenElement(propertyPrefix + "[" + counter + "]", element, resultMap,
-                valueTransformer);
+        for (Object element : list) {
+            flattenElement(
+                propertyPrefix + "[" + counter + "]",
+                element,
+                resultMap,
+                valueTransformer
+            );
             counter++;
         }
     }

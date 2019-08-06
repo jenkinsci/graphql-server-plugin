@@ -16,8 +16,10 @@ import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
 import graphql.schema.GraphQLTypeReference;
+import graphql.schema.GraphqlTypeBuilder;
 import graphql.schema.StaticDataFetcher;
 import graphql.schema.TypeResolver;
+import hudson.model.AbstractItem;
 import hudson.model.Action;
 import hudson.model.Descriptor;
 import hudson.model.Items;
@@ -72,7 +74,7 @@ public class Builders {
 //          .type(AdditionalScalarTypes.CLASS_SCALAR)
             .build();
     }
-    private static void makeClassIdDefintion(Class<?> clazz, GraphQLObjectType.Builder fieldBuilder) {
+    private static void makeClassIdDefintion(Class<?> clazz, GraphqlTypeBuilderWrapper fieldBuilder) {
         final Method idMethod = IdFinder.idMethod(clazz);
         if (idMethod == null) {
             return;
@@ -135,9 +137,8 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<Class, GraphQLObjectType.Builder> graphQLTypes = new HashMap();
-    private HashMap<String, GraphQLObjectType.Builder> mockGraphQLTypes = new HashMap();
-    private HashSet<Class> interfaces = new HashSet();
+    private HashMap<Class, GraphqlTypeBuilderWrapper> graphQLTypes = new HashMap();
+    private HashMap<String, GraphqlTypeBuilderWrapper> mockGraphQLTypes = new HashMap();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
@@ -148,12 +149,11 @@ public class Builders {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
         }
 
+        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
+
         // interfaces are never exported, so handle them seperately
-        if (Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers())) {
-            if (!interfaces.contains(clazz)) {
-                interfaces.add(clazz);
-                classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
-            }
+        if (isInterface) {
+            classQueue.addAll(ClassUtils.findSubclasses(MODEL_BUILDER, clazz));
         } else {
             try {
                 MODEL_BUILDER.get(clazz);
@@ -173,34 +173,28 @@ public class Builders {
         if (graphQLTypes.containsKey(clazz)) {
             return;
         }
+
         if (shouldIgnoreClass(clazz)) {
             return;
         }
 
+        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
         try {
             MODEL_BUILDER.get(clazz);
         } catch (org.kohsuke.stapler.export.NotExportableException e) {
-            GraphQLObjectType.Builder fieldBuilder = GraphQLObjectType.newObject();
-            fieldBuilder.name(ClassUtils.getGraphQLClassName(clazz))
-                .field(makeClassFieldDefinition());
-            makeClassIdDefintion(clazz, fieldBuilder);
-
-            interfaces.add(clazz);
-            mockGraphQLTypes.put(
-                ClassUtils.getGraphQLClassName(clazz) + "__",
-                GraphQLObjectType.newObject()
-                    .name(ClassUtils.getGraphQLClassName(clazz) + "__")
-                    .description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined")
-                    .field(makeClassFieldDefinition())
-                    .withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)))
-
-            );
-            makeClassIdDefintion(clazz, mockGraphQLTypes.get(ClassUtils.getGraphQLClassName(clazz) + "__"));
-
-            graphQLTypes.put(clazz, fieldBuilder);
-            return;
+            isInterface = true;
         }
-        graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz));
+
+        if (isInterface) {
+            /* make mock class */
+            GraphqlTypeBuilderWrapper mockClassFieldBuilder = buildGraphQLTypeFromModel(clazz, false);
+            mockClassFieldBuilder.name(ClassUtils.getGraphQLClassName(clazz) + "__");
+            mockClassFieldBuilder.description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined");
+            makeClassIdDefintion(clazz, mockClassFieldBuilder);
+            mockClassFieldBuilder.withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)));
+            mockGraphQLTypes.put(ClassUtils.getGraphQLClassName(clazz) + "__", mockClassFieldBuilder);
+        }
+        graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz, isInterface));
     }
 
     static boolean shouldIgnoreClass(Class clazz) {
@@ -208,11 +202,12 @@ public class Builders {
     }
 
     @SuppressWarnings("squid:S135")
-    GraphQLObjectType.Builder buildGraphQLTypeFromModel(Class clazz) {
+    GraphqlTypeBuilderWrapper buildGraphQLTypeFromModel(Class clazz, boolean isInterface) {
+        Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class)null, (String)null);
 
-        Model<?> model = MODEL_BUILDER.get(clazz);
-
-        GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
+        GraphqlTypeBuilderWrapper typeBuilder = new GraphqlTypeBuilderWrapper(
+            isInterface ? GraphQLInterfaceType.newInterface() : GraphQLObjectType.newObject()
+        );
 
         Jenkins instance = Jenkins.getInstanceOrNull();
         if (instance != null) {
@@ -222,99 +217,101 @@ public class Builders {
             }
         }
 
-        typeBuilder
-            .name(ClassUtils.getGraphQLClassName(clazz))
-            .field(makeClassFieldDefinition());
+        typeBuilder.name(ClassUtils.getGraphQLClassName(clazz));
+
+        typeBuilder.field(makeClassFieldDefinition());
         makeClassIdDefintion(clazz, typeBuilder);
 
-        ArrayList<Model<?>> queue = new ArrayList<>();
-        queue.add(model);
+        if (model != null) {
+            ArrayList<Model<?>> queue = new ArrayList<>();
+            queue.add(model);
 
-        Model<?> superModel = model.superModel;
-        while (superModel != null) {
-            queue.add(superModel);
-            superModel = superModel.superModel;
-        }
+            Model<?> superModel = model.superModel;
+            while (superModel != null) {
+                queue.add(superModel);
+                superModel = superModel.superModel;
+            }
 
-        for (Model<?> _model : queue) {
-            for (Property p : _model.getProperties()) {
-                if (typeBuilder.hasField(p.name)) {
-                    continue;
-                }
-                Class propertyClazz = p.getType();
+            for (Model<?> _model : queue) {
+                for (Property p : _model.getProperties()) {
+                    if (typeBuilder.hasField(p.name)) {
+                        continue;
+                    }
+                    Class propertyClazz = p.getType();
 
-                GraphQLOutputType className;
-                if ("id".equals(p.name)) {
-                    continue; /// we handle it in a different way
-                } else if (propertyClazz.isArray()) {
-                    className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
-                } else if (Collection.class.isAssignableFrom(propertyClazz)) {
-                    className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));
-                } else {
-                    className = createSchemaClassName(propertyClazz);
-                }
+                    GraphQLOutputType className;
+                    if ("id".equals(p.name)) {
+                        continue; /// we handle it in a different way
+                    } else if (propertyClazz.isArray()) {
+                        className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
+                    } else if (Collection.class.isAssignableFrom(propertyClazz)) {
+                        className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));
+                    } else {
+                        className = createSchemaClassName(propertyClazz);
+                    }
 
-                GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition()
-                    .name(p.name)
-                    .type(className)
-                    .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()));
+                    GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition()
+                        .name(p.name)
+                        .type(className)
+                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()));
 
-                if (className instanceof GraphQLList) {
-                    fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
-                        int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
-                        int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
-                        String id = dataFetchingEnvironment.getArgument(ARG_ID);
+                    if (className instanceof GraphQLList) {
+                        fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
+                            int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
+                            int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
+                            String id = dataFetchingEnvironment.getArgument(ARG_ID);
 
-                        List<?> valuesList;
-                        Object values = p.getValue(dataFetchingEnvironment.getSource());
-                        if (values instanceof List) {
-                            valuesList = ((List<?>)values);
-                        } else {
-                            valuesList = Arrays.asList((Object[]) values);
+                            List<?> valuesList;
+                            Object values = p.getValue(dataFetchingEnvironment.getSource());
+                            if (values instanceof List) {
+                                valuesList = ((List<?>) values);
+                            } else {
+                                valuesList = Arrays.asList((Object[]) values);
 
-                        }
-                        if (id != null && !id.isEmpty()) {
-                            for (Object value : valuesList) {
-                                Method method = IdFinder.idMethod(value.getClass());
-                                if (method == null) {
-                                    continue;
-                                }
-
-                                String objectId = String.valueOf(method.invoke(value));
-                                if (id.equals(objectId)) {
-                                    return Stream.of(value)
-                                        .filter(StreamUtils::isAllowed)
-                                        .toArray();
-                                }
                             }
-                            return null;
-                        }
+                            if (id != null && !id.isEmpty()) {
+                                for (Object value : valuesList) {
+                                    Method method = IdFinder.idMethod(value.getClass());
+                                    if (method == null) {
+                                        continue;
+                                    }
 
-                        return Lists.newArrayList(slice(valuesList, offset, limit))
-                            .stream()
-                            .filter(StreamUtils::isAllowed)
-                            .toArray();
-                    });
-                    fieldBuilder.argument(GraphQLArgument.newArgument()
+                                    String objectId = String.valueOf(method.invoke(value));
+                                    if (id.equals(objectId)) {
+                                        return Stream.of(value)
+                                            .filter(StreamUtils::isAllowed)
+                                            .toArray();
+                                    }
+                                }
+                                return null;
+                            }
+
+                            return Lists.newArrayList(slice(valuesList, offset, limit))
+                                .stream()
+                                .filter(StreamUtils::isAllowed)
+                                .toArray();
+                        });
+                        fieldBuilder.argument(GraphQLArgument.newArgument()
                             .name(ARG_OFFSET)
                             .type(Scalars.GraphQLInt)
                             .defaultValue(0)
                         )
-                        .argument(GraphQLArgument.newArgument()
-                            .name(ARG_LIMIT)
-                            .type(Scalars.GraphQLInt)
-                            .defaultValue(100)
-                        )
-                        .argument(GraphQLArgument.newArgument()
-                            .name(ARG_TYPE)
-                            .type(Scalars.GraphQLString)
-                        )
-                        .argument(GraphQLArgument.newArgument()
-                            .name(ARG_ID)
-                            .type(Scalars.GraphQLID)
-                        );
+                            .argument(GraphQLArgument.newArgument()
+                                .name(ARG_LIMIT)
+                                .type(Scalars.GraphQLInt)
+                                .defaultValue(100)
+                            )
+                            .argument(GraphQLArgument.newArgument()
+                                .name(ARG_TYPE)
+                                .type(Scalars.GraphQLString)
+                            )
+                            .argument(GraphQLArgument.newArgument()
+                                .name(ARG_ID)
+                                .type(Scalars.GraphQLID)
+                            );
+                    }
+                    typeBuilder.field(fieldBuilder.build());
                 }
-                typeBuilder = typeBuilder.field(fieldBuilder.build());
             }
         }
         return typeBuilder;
@@ -324,13 +321,13 @@ public class Builders {
     public GraphQLSchema buildSchema() {
         GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 
-        queryType.field(buildAllQuery(Job.class));
+        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
         queryType.field(buildAllQuery(User.class));
         queryType.field(buildActionQuery(WhoAmI.class));
 
+        classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
-        classQueue.addAll(this.interfaces);
         classQueue.addAll(this.extraTopLevelClasses);
 
         while (!classQueue.isEmpty()) {
@@ -342,34 +339,40 @@ public class Builders {
         HashSet<GraphQLType> types = new HashSet<>();
         GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
 
-        for (Class clazz : interfaces) {
-            GraphQLInterfaceType interfaceType = convertToInterface(graphQLTypes.remove(clazz).build());
-            types.add(interfaceType);
-            LOGGER.info("Interface:" + interfaceType.getName());
-            codeRegistry.typeResolver(interfaceType.getName(), buildTypeResolver());
+        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
+            if (!interfaceClazz.getValue().isInterface()) {
+                continue;
+            }
+            LOGGER.info("Interface:" + interfaceClazz.getValue().getName());
+            codeRegistry.typeResolver(interfaceClazz.getValue().getName(), buildTypeResolver());
         }
 
-        for (Class<?> interfaceClazz : interfaces) {
-            for (Map.Entry<Class, GraphQLObjectType.Builder> instanceClazz : this.graphQLTypes.entrySet()) {
-                if (interfaceClazz != instanceClazz.getKey() && interfaceClazz.isAssignableFrom(instanceClazz.getKey())) {
-                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz)));
+        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
+            if (!interfaceClazz.getValue().isInterface()) {
+                continue;
+            }
+            for (Map.Entry<Class, GraphqlTypeBuilderWrapper> instanceClazz : this.graphQLTypes.entrySet()) {
+                if (instanceClazz.getValue().isInterface()) {
+                    continue;
+                }
+                if (interfaceClazz.getKey() != instanceClazz.getKey() && interfaceClazz.getKey().isAssignableFrom(instanceClazz.getKey())) {
+                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz.getKey())));
                 }
             }
         }
 
         types.addAll(
             Stream.concat(
-                this.mockGraphQLTypes.values().stream(),
-                this.graphQLTypes.values().stream()
+                this.graphQLTypes.values().stream(),
+                this.mockGraphQLTypes.values().stream()
             )
-                .map(GraphQLObjectType.Builder::build)
-                .filter(distinctByKey(GraphQLObjectType::getName))
+                .filter(distinctByKey(GraphqlTypeBuilderWrapper::getName))
+                .map(GraphqlTypeBuilderWrapper::build)
                 .collect(Collectors.toList())
         );
 
         this.graphQLTypes = null;
         this.mockGraphQLTypes = null;
-        this.interfaces = null;
         this.classQueue = null;
         this.extraTopLevelClasses = null;
 
@@ -435,8 +438,12 @@ public class Builders {
     }
 
     public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz) {
+        return buildAllQuery(defaultClazz, "all" + defaultClazz.getSimpleName() + "s");
+    }
+
+    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz, String fieldName) {
         return GraphQLFieldDefinition.newFieldDefinition()
-            .name("all" + defaultClazz.getSimpleName() + "s")
+            .name(fieldName)
             .type(GraphQLList.list(createSchemaClassName(defaultClazz)))
             .argument(GraphQLArgument.newArgument()
                 .name(ARG_OFFSET)

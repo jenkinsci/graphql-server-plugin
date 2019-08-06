@@ -27,6 +27,7 @@ import io.jenkins.plugins.graphql.utils.SchemaTypeBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
 import org.json.JSONObject;
 import org.junit.Before;
+import org.junit.ComparisonFailure;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -93,7 +94,7 @@ public class GraphQLSchemaGeneratorTest {
     public void actions() throws IOException {
         FreeStyleProject freeStyleProject = j.createFreeStyleProject();
 
-        GraphQLInterfaceType graphqlRun = (GraphQLInterfaceType) graphQLSchema.getType("hudson_model_Job");
+        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_FreeStyleProject");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
@@ -108,7 +109,7 @@ public class GraphQLSchemaGeneratorTest {
         j.createFreeStyleProject("two");
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput()
-            .query("query { allJobs(id: \"one\") { _class\nname } }")
+            .query("query { allItems(id: \"one\") { _class\nname } }")
             .build();
         ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
         if (executeResult.getErrors().size() != 0) {
@@ -116,18 +117,18 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            new Gson().fromJson("{\"allJobs\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}", Map.class),
+            new Gson().fromJson("{\"allItems\":[{\"_class\":\"hudson.model.FreeStyleProject\", \"name\": \"one\"}]}", Map.class),
             executeResult.getData()
         );
     }
 
     @Test
-    public void getJobByNameNonExistant() throws IOException {
+    public void getJobByNameNonExistent() throws IOException {
         j.createFreeStyleProject("one");
         j.createFreeStyleProject("two");
 
         ExecutionInput executionInput = ExecutionInput.newExecutionInput()
-            .query("query { allJobs(id: \"nonexistant\") { _class\nname } }")
+            .query("query { allItems(id: \"nonexistant\") { _class\nname } }")
             .build();
         ExecutionResult executeResult = GraphQL.newGraphQL(graphQLSchema).build().execute(executionInput);
         if (executeResult.getErrors().size() != 0) {
@@ -135,7 +136,7 @@ public class GraphQLSchemaGeneratorTest {
         }
 
         assertEquals(
-            new Gson().fromJson("{\"allJobs\":[ ]}", Map.class),
+            new Gson().fromJson("{\"allItems\":[ ]}", Map.class),
             executeResult.getData()
         );
     }
@@ -314,6 +315,19 @@ public class GraphQLSchemaGeneratorTest {
 
         assertSchemaType(
             SchemaTypeResponse.newSchemaTypeResponse()
+                .name("hudson_model_FreeStyleProject")
+                .kind("OBJECT")
+                .description("Freestyle project")
+                .interfaces("INTERFACE", "hudson_model_AbstractProject", null)
+                .interfaces("INTERFACE", "hudson_model_Job", null)
+                .interfaces("INTERFACE", "hudson_model_AbstractItem", null)
+                .interfaces("INTERFACE", "hudson_model_Project", null)
+                .toHashMap(),
+            getSchemaType(executionResult, "hudson_model_FreeStyleProject")
+        );
+
+        assertSchemaType(
+            SchemaTypeResponse.newSchemaTypeResponse()
                 .name("hudson_model_Action__")
                 .description("Generic implementation of Action with just _class defined")
                 .kind("OBJECT")
@@ -333,10 +347,10 @@ public class GraphQLSchemaGeneratorTest {
                 .fields(
                     SchemaFieldBuilder.newFieldBuilder()
                         .name("causes")
-                        .args("offset",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
-                        .args("limit",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
-                        .args("type",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("String").toHashMap())
-                        .args("id",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").toHashMap())
+                        .args("offset",null,"0",SchemaTypeResponse.newSchemaTypeResponse().name("Int").kind("SCALAR").toHashMap())
+                        .args("limit",null,"100",SchemaTypeResponse.newSchemaTypeResponse().name("Int").kind("SCALAR").toHashMap())
+                        .args("type",null,null,SchemaTypeResponse.newSchemaTypeResponse().name("String").kind("SCALAR").toHashMap())
+                        .args("id",null,null,SchemaTypeResponse.newSchemaTypeResponse().name("ID").kind("SCALAR").toHashMap())
                         .type("LIST",null, SchemaTypeBuilder.newTypeBuilder().kind("INTERFACE").name("hudson_model_Cause").toHashMap())
                         .toHashMap()
                 )
@@ -361,8 +375,14 @@ public class GraphQLSchemaGeneratorTest {
         Map expectedFlattened = JsonMapFlattener.flatten(expected);
         Map actualFlattened = JsonMapFlattener.flatten(actual);
 
-        for (Object key : expectedFlattened.entrySet()) {
-            assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
+
+        for (Object key : expectedFlattened.keySet()) {
+            try {
+                assertEquals(key.toString() + " is equal", expectedFlattened.get(key), actualFlattened.get(key));
+            } catch (ComparisonFailure e) {
+                e.printStackTrace();
+                assertEquals(expectedFlattened, actualFlattened);
+            }
         }
     }
 
