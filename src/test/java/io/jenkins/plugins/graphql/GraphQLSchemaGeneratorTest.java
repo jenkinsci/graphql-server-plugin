@@ -12,6 +12,7 @@ import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
@@ -93,7 +94,7 @@ public class GraphQLSchemaGeneratorTest {
     public void actions() throws IOException {
         FreeStyleProject freeStyleProject = j.createFreeStyleProject();
 
-        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_Job");
+        GraphQLObjectType graphqlRun = (GraphQLObjectType) graphQLSchema.getType("hudson_model_FreeStyleProject");
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
@@ -122,7 +123,7 @@ public class GraphQLSchemaGeneratorTest {
     }
 
     @Test
-    public void getJobByNameNonExistant() throws IOException {
+    public void getJobByNameNonExistent() throws IOException {
         j.createFreeStyleProject("one");
         j.createFreeStyleProject("two");
 

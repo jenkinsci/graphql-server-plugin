@@ -31,7 +31,7 @@ public class BuildersTest {
             }
         };
 
-        GraphQLObjectType graphQLObjectType = (GraphQLObjectType) builders.buildGraphQLTypeFromModel(TestExportedClass.class).build();
+        GraphQLObjectType graphQLObjectType = (GraphQLObjectType) builders.buildGraphQLTypeFromModel(TestExportedClass.class, false).build();
         Assert.assertEquals(
             null,
             graphQLObjectType.getDescription()
