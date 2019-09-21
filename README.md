@@ -17,7 +17,3 @@ as the 'Component'.
 ## Changelog
 
 See [GitHub Releases](https://github.com/jenkinsci/graphql-server-plugin/releases)
-
-## Todo
-// FieldCoordinates coordinates = FieldCoordinates.coordinates(parentType, field);
-// environment.getCodeRegistry().dataFetcher(coordinates, dataFetcher);
