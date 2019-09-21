@@ -4,12 +4,16 @@ import React, { Component } from "react";
 import "whatwg-fetch";
 import GraphiQL from "graphiql";
 import GraphiQLExplorer from "graphiql-explorer";
+import CodeExporter from 'graphiql-code-exporter'
+import snippets from 'graphiql-code-exporter/lib/snippets'
 import { buildClientSchema, getIntrospectionQuery, parse } from "graphql";
 
 import { makeDefaultArg, getDefaultScalarArgValue } from "./CustomArgs";
 
 import "graphiql/graphiql.css";
 import "./App.css";
+import 'codemirror/theme/neo.css'
+import 'graphiql-code-exporter/CodeExporter.css';
 
 import type { GraphQLSchema } from "graphql";
 
@@ -137,7 +141,11 @@ type State = {
 class App extends Component<{}, State> {
   // eslint-disable-next-line react/sort-comp
   _graphiql: GraphiQL;
-  state = { schema: null, query: DEFAULT_QUERY, explorerIsOpen: true };
+  state = { schema: null, query: DEFAULT_QUERY, explorerIsOpen: true, codeExporterIsVisible: false };
+
+  handleToggleCodeExporter = () => this.setState({
+    codeExporterIsVisible: !this.state.codeExporterIsVisible
+  })
 
   componentDidMount() {
     fetcher({
@@ -219,7 +227,19 @@ class App extends Component<{}, State> {
   };
 
   render() {
-    const { query, schema } = this.state;
+    const { query, schema, codeExporterIsVisible } = this.state;
+
+    const codeExporter = codeExporterIsVisible ? (
+      <CodeExporter
+        hideCodeExporter={this.handleToggleCodeExporter}
+        serverUrl={window.location.protocol + '://' + window.location.host + document.head.dataset.rooturl + '/graphql'}
+        snippets={snippets}
+        query={query}
+        codeMirrorTheme="neo"
+      />
+    ) : null
+
+
     return (
       <div className="graphiql-container">
         <GraphiQLExplorer
@@ -257,8 +277,14 @@ class App extends Component<{}, State> {
               label="Explorer"
               title="Toggle Explorer"
             />
+            <GraphiQL.Button
+              onClick={this.handleToggleCodeExporter}
+              label="Code Exporter"
+              title="Toggle Code Exporter"
+            />
           </GraphiQL.Toolbar>
         </GraphiQL>
+        {codeExporter}
       </div>
     );
   }

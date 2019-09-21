@@ -68,7 +68,10 @@
       "everything-else"
     ]}],
     "react/jsx-boolean-value": 2,
-    "react/jsx-handler-names": 2,
+    "react/jsx-handler-names": ["error", {
+        "eventHandlerPrefix": "(handle)",
+        "eventHandlerPropPrefix": "(on|hide)"
+    }],
     "react/jsx-key": 2,
     "react/jsx-no-duplicate-props": 2,
     "react/jsx-no-literals": 2,
