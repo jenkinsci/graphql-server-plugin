@@ -16,7 +16,7 @@
         <jenkins.version>2.150.1</jenkins.version>
         <java.level>8</java.level>
         <powermock.version>2.0.2</powermock.version>
-        <frontend.version>1.7.6</frontend.version>
+        <frontend.version>1.8.0</frontend.version>
         <node.version>v10.16.0</node.version>
         <npm.version>6.10.0</npm.version>
     </properties>
