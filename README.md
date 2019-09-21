@@ -1,103 +1,23 @@
 # Graphql Server Plugin
 
 [![Build Status](https://ci.jenkins.io/buildStatus/icon?style=plastic&job=Plugins%2Fgraphql-server-plugin%2Fmaster)](https://ci.jenkins.io/job/Plugins/job/graphql-server-plugin/job/master/)
+[![GitHub release](https://img.shields.io/github/release/jenkinsci/graphql-server-plugin.svg?label=release)](https://github.com/jenkinsci/graphql-server-plugin/releases/latest)
+[![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=jenkinsci/graphql-server-plugin)](https://dependabot.com)
 
-A graphql implementation for jenkins.
+This plugin provides a graphql server api implementation for Jenkins.
 
-## WARNING: This is currently a work in progress
+There is an web ui based explorer at /graphql/client, and the api endpoint is /graphql/
 
-## "Feature Complete" query
+## Reporting issues
 
-```
-query allItems {
-  allItems {
-    name
-    id
-    _class
-    actions {
-      _class
-    }
-    description
-    displayName
-    fullDisplayName
-    url
-    ... on hudson_model_Job {
-      allBuilds {
-        _class
-        id
-        actions {
-          _class
-          ... on hudson_tasks_junit_TestResultAction {
-            _class
-            failCount
-            skipCount
-            totalCount
-            urlName
-          }
-          ... on hudson_model_CauseAction {
-            causes {
-              _class
-              shortDescription
-              ... on hudson_model_Cause_UserIdCause {
-                userId
-                userName
-              }
-            }
-          }
-        }
-        artifacts {
-          _class
-          displayPath
-          fileName
-          relativePath
-        }
-        building
-        duration
-        estimatedDuration
-        executor {
-          _class
-          currentExecutable {
-            _class
-          }
-          idle
-          likelyStuck
-          number
-          progress
-        }
-        fingerprint {
-          _class
-          fileName
-          hash
-          timestamp
-        }
-        keepLog
-        number
-        queueId
-        result
-        timestamp
-      }
-    }
-  }
-  allUsers {
-    _class
-    absoluteUrl
-    description
-    fullName
-    id
-    property {
-      _class
-    }
-  }
-  whoAmI {
-    anonymous
-    authenticated
-    authorities
-    details
-    name
-    toString
-  }
-}
-```
+Please create a ticket for any bug reports or feature requests on
+[Jenkins JIRA](https://issues.jenkins-ci.org/) and add `graphql-server-plugin`
+as the 'Component'.
 
+## Changelog
+
+See [GitHub Releases](https://github.com/jenkinsci/graphql-server-plugin/releases)
+
+## Todo
 // FieldCoordinates coordinates = FieldCoordinates.coordinates(parentType, field);
 // environment.getCodeRegistry().dataFetcher(coordinates, dataFetcher);
