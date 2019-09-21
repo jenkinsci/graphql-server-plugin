@@ -232,7 +232,7 @@ class App extends Component<{}, State> {
     const codeExporter = codeExporterIsVisible ? (
       <CodeExporter
         hideCodeExporter={this.handleToggleCodeExporter}
-        serverUrl={window.location.protocol + '://' + window.location.host + document.head.dataset.rooturl + '/graphql'}
+        serverUrl={window.location.protocol + '//' + window.location.host + document.head.dataset.rooturl + '/graphql'}
         snippets={snippets}
         query={query}
         codeMirrorTheme="neo"
