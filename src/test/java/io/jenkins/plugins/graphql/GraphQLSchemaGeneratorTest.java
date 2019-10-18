@@ -1,18 +1,15 @@
 package io.jenkins.plugins.graphql;
 
+import com.gargoylesoftware.htmlunit.HttpMethod;
+import com.gargoylesoftware.htmlunit.WebRequest;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.JsonNode;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.exceptions.UnirestException;
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLInterfaceType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLSchema;
@@ -25,7 +22,9 @@ import io.jenkins.plugins.graphql.utils.JsonMapFlattener;
 import io.jenkins.plugins.graphql.utils.SchemaFieldBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
-import org.json.JSONObject;
+import net.sf.json.JSONNull;
+import net.sf.json.JSONObject;
+import net.sf.json.test.JSONAssert;
 import org.junit.Before;
 import org.junit.ComparisonFailure;
 import org.junit.Rule;
@@ -36,6 +35,7 @@ import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
@@ -98,7 +98,7 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            new Gson().fromJson("{\"test\":{\"_class\":\"hudson.model.FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins.model.RenameAction\"},{\"_class\":\"com.cloudbees.plugins.credentials.ViewCredentialsAction\"}]}}", Map.class),
+            new Gson().fromJson("{test={_class=hudson.model.FreeStyleProject, actions=[{_class=jenkins.model.RenameAction}, {_class=org.jenkinsci.plugins.displayurlapi.actions.JobDisplayAction}, {_class=com.cloudbees.plugins.credentials.ViewCredentialsAction}]}}", Map.class),
             executeResult.getData()
         );
     }
@@ -177,7 +177,7 @@ public class GraphQLSchemaGeneratorTest {
         );
     }
 
-    public JSONObject postQuery(String username, String password, String query) throws UnirestException {
+    public JSONObject postQuery(String username, String password, String query) throws Exception {
         CrumbIssuer crumbIssuer = j.jenkins.getCrumbIssuer();
         assertNotNull(crumbIssuer);
         String CrumbField = crumbIssuer.getCrumbRequestField();
@@ -186,18 +186,23 @@ public class GraphQLSchemaGeneratorTest {
         JSONObject body = new JSONObject();
         body.put("query", query);
 
-        HttpResponse<JsonNode> response = Unirest.post(j.jenkins.getRootUrl() + "graphql/")
-            .header("Content-Type","application/json")
-            .basicAuth(username, password)
-            .header( CrumbField, CrumbValue )
-            .body(body.toString())
-            .asJson();
-        assertEquals(200, response.getStatus());
-        return response.getBody().getObject().getJSONObject("data");
+        JenkinsRule.WebClient wc = j.createWebClient().withBasicCredentials(username, password);
+        WebRequest req = new WebRequest(new URL(j.jenkins.getRootUrl() + "graphql/"), HttpMethod.POST);
+        req.setAdditionalHeader(CrumbField, CrumbValue);
+        req.setAdditionalHeader("Content-Type","application/json");
+        req.setRequestBody(body.toString());
+
+        String rawResult = wc.getPage(req).getWebResponse().getContentAsString();
+        assertNotNull(rawResult);
+
+        JSONObject result = JSONObject.fromObject(rawResult);
+        assertNotNull(result);
+
+        return result.getJSONObject("data");
     }
 
     @Test
-    public void whoamiNoAuth() throws UnirestException {
+    public void whoamiNoAuth() throws Exception {
         JSONObject data = postQuery(
             null,
             null,
@@ -210,8 +215,8 @@ public class GraphQLSchemaGeneratorTest {
             Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
         );
         assertEquals(
-            null,
-            whoamiData.optString("details", null)
+            "null",
+            whoamiData.optString("details", "null")
         );
         assertEquals(
             true,
@@ -224,7 +229,7 @@ public class GraphQLSchemaGeneratorTest {
     }
 
     @Test
-    public void whoamiAuth() throws UnirestException {
+    public void whoamiAuth() throws Exception {
         JenkinsRule.DummySecurityRealm dummySecurityRealm = j.createDummySecurityRealm();
         j.jenkins.setSecurityRealm(dummySecurityRealm);
 

@@ -5,9 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "parcel watch --public-url ./ ./src/main/resources/io/jenkins/plugins/graphql/GraphQLRootAction/script.js -d ./src/main/webapp/js",
-    "build": "parcel build --public-url ./ ./src/main/resources/io/jenkins/plugins/graphql/GraphQLRootAction/script.js -d ./src/main/webapp/js",
+    "mvnbuild": "parcel build --public-url ./ ./src/main/resources/io/jenkins/plugins/graphql/GraphQLRootAction/script.js -d ./src/main/webapp/js",
+    "build": "npm run mvnbuild",
     "lint": "eslint  --ext .js,.jsx --ignore-path .gitignore src",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "mvntest": "npm run lint",
+    "test": "npm run test"
   },
   "repository": {
     "type": "git",
