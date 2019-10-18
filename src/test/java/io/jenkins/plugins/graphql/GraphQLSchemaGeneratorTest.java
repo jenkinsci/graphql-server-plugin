@@ -22,7 +22,9 @@ import io.jenkins.plugins.graphql.utils.JsonMapFlattener;
 import io.jenkins.plugins.graphql.utils.SchemaFieldBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeBuilder;
 import io.jenkins.plugins.graphql.utils.SchemaTypeResponse;
+import net.sf.json.JSONNull;
 import net.sf.json.JSONObject;
+import net.sf.json.test.JSONAssert;
 import org.junit.Before;
 import org.junit.ComparisonFailure;
 import org.junit.Rule;
@@ -96,7 +98,7 @@ public class GraphQLSchemaGeneratorTest {
         ExecutionResult executeResult = _queryDataSet(graphQLSchema, freeStyleProject, graphqlRun, "_class\nactions { _class }");
 
         assertEquals(
-            new Gson().fromJson("{\"test\":{\"_class\":\"hudson.model.FreeStyleProject\",\"actions\":[{\"_class\":\"jenkins.model.RenameAction\"},{\"_class\":\"com.cloudbees.plugins.credentials.ViewCredentialsAction\"}]}}", Map.class),
+            new Gson().fromJson("{test={_class=hudson.model.FreeStyleProject, actions=[{_class=jenkins.model.RenameAction}, {_class=org.jenkinsci.plugins.displayurlapi.actions.JobDisplayAction}, {_class=com.cloudbees.plugins.credentials.ViewCredentialsAction}]}}", Map.class),
             executeResult.getData()
         );
     }
@@ -213,8 +215,8 @@ public class GraphQLSchemaGeneratorTest {
             Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
         );
         assertEquals(
-            null,
-            whoamiData.optString("details", null)
+            "null",
+            whoamiData.optString("details", "null")
         );
         assertEquals(
             true,
