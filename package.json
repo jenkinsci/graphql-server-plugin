@@ -38,7 +38,7 @@
     "prettier": "^1.18.2"
   },
   "dependencies": {
-    "graphiql": "^0.15.1",
+    "graphiql": "^0.16.0",
     "graphiql-code-exporter": "^2.0.5",
     "graphiql-explorer": "^0.4.5",
     "graphql": "^14.5.8",
