@@ -18,7 +18,7 @@
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <title>GraphQL Playground</title>
             <script>window.rootURL = "${rootURL}"</script>
-            <link rel="stylesheet" href="${rootURL}/plugin/graphql-server/js/script.css" />
+            <link rel="stylesheet" href="${resURL}/plugin/graphql-server/js/script.css" />
         </head>
         <body>
             <style>
@@ -28,7 +28,7 @@
             </style>
 
             <div id="graphiql">Loading...</div>
-            <script src="${rootURL}/plugin/graphql-server/js/script.js"></script>
+            <script src="${resURL}/plugin/graphql-server/js/script.js"></script>
         </body>
     </html>
 </j:jelly>
