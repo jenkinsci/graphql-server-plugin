@@ -43,7 +43,7 @@
     "graphiql-explorer": "^0.4.5",
     "graphql": "^14.5.8",
     "prop-types": "^15.7.2",
-    "react": "^16.11.0",
+    "react": "^16.12.0",
     "react-dom": "^16.11.0",
     "whatwg-fetch": "^3.0.0"
   },
