@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "graphiql": "^0.17.5",
-    "graphiql-code-exporter": "^2.0.7",
+    "graphiql-code-exporter": "^2.0.8",
     "graphiql-explorer": "^0.4.5",
     "graphql": "^14.5.8",
     "prop-types": "^15.7.2",
