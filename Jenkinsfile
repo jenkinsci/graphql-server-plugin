@@ -30,13 +30,6 @@ pipeline {
             post {
                 always {
                     junit 'target/surefire-reports/*.xml'
-
-                    script {
-                        // def scannerHome = tool 'SonarQube Scanner 3.3';
-                        withSonarQubeEnv {
-                            sh "mvn -B ${env.SONAR_MAVEN_GOAL} -Dsonar.host.url=${env.SONAR_HOST_URL}"
-                        }
-                    }
                 }
             }
         }
