@@ -6,6 +6,9 @@ if (JENKINS_URL == 'https://ci.jenkins.io/') {
 }
 
 pipeline {
+    environment {
+        HOME = "${env.WORKSPACE}"
+    }
     agent {
         docker {
             image 'maven:3.6-jdk-8'
