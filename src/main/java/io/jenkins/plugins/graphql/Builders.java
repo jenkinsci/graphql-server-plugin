@@ -3,56 +3,32 @@ package io.jenkins.plugins.graphql;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.common.io.Files;
 import graphql.Scalars;
-import graphql.scalars.ExtendedScalars;
-import graphql.schema.GraphQLArgument;
-import graphql.schema.GraphQLCodeRegistry;
-import graphql.schema.GraphQLDirective;
-import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLInterfaceType;
-import graphql.schema.GraphQLList;
-import graphql.schema.GraphQLObjectType;
-import graphql.schema.GraphQLOutputType;
-import graphql.schema.GraphQLSchema;
-import graphql.schema.GraphQLType;
-import graphql.schema.GraphQLTypeReference;
-import graphql.schema.GraphqlTypeBuilder;
-import graphql.schema.StaticDataFetcher;
-import graphql.schema.TypeResolver;
-import hudson.model.AbstractItem;
-import hudson.model.Action;
-import hudson.model.Descriptor;
-import hudson.model.Items;
-import hudson.model.Job;
-import hudson.model.User;
+import graphql.TypeResolutionEnvironment;
+import graphql.language.FieldDefinition;
+import graphql.schema.*;
+import graphql.schema.idl.*;
+import hudson.model.*;
 import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
+import org.apache.commons.lang.StringUtils;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.PriorityQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -65,36 +41,27 @@ public class Builders {
     private static final String ARG_TYPE = "type";
     private static final String ARG_ID = "id";
 
-    private static GraphQLFieldDefinition makeClassFieldDefinition() {
-        return GraphQLFieldDefinition.newFieldDefinition()
-            .name("_class")
-            .description("Class Name")
-            .type(Scalars.GraphQLString)
-            .dataFetcher(dataFetcher -> ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getName())
-//          .type(AdditionalScalarTypes.CLASS_SCALAR)
-            .build();
-    }
-    private static void makeClassIdDefintion(Class<?> clazz, GraphqlTypeBuilderWrapper fieldBuilder) {
+    private static String makeClassIdDefintion(final Class<?> clazz) {
         final Method idMethod = IdFinder.idMethod(clazz);
         if (idMethod == null) {
-            return;
+            return "";
         }
-        fieldBuilder.field(GraphQLFieldDefinition.newFieldDefinition()
-            .name("id")
-            .description("Unique ID")
-            .type(Scalars.GraphQLID)
-            .dataFetcher(dataFetcher -> idMethod.invoke(dataFetcher.getSource()))
-        .build());
+        final StringBuilder sb = new StringBuilder();
+        sb.append("  \"UniqueID\"\n");
+        sb.append("  id: ID\n");
+        return sb.toString();
+        // .dataFetcher(dataFetcher -> idMethod.invoke(dataFetcher.getSource()))
     }
 
-    private static Iterator<?> slice(Iterable<?> base, int start, int limit) {
+    private static Iterator<?> slice(final Iterable<?> base, final int start, final int limit) {
         return Iterators.limit(Iterables.skip(base, start).iterator(), limit);
     }
 
-
-    private static final HashMap<String, GraphQLOutputType> javaTypesToGraphqlTypes = new HashMap<>();
+    private static final HashMap<String, GraphQLScalarType> javaTypesToGraphqlTypes = new HashMap<>();
 
     static {
+        javaTypesToGraphqlTypes.put("ID", Scalars.GraphQLID);
+
         javaTypesToGraphqlTypes.put("boolean", Scalars.GraphQLBoolean);
         javaTypesToGraphqlTypes.put(Boolean.class.getSimpleName(), Scalars.GraphQLBoolean);
 
@@ -129,27 +96,21 @@ public class Builders {
 
     }
 
-    // Utility function to find distinct by class field
-    private static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor)
-    {
-        Map<Object, Boolean> map = new ConcurrentHashMap<>();
-        return t -> map.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
-    }
-
     /*** DONE STATIC */
-    private HashMap<Class, GraphqlTypeBuilderWrapper> graphQLTypes = new HashMap();
-    private HashMap<String, GraphqlTypeBuilderWrapper> mockGraphQLTypes = new HashMap();
+    private HashMap<Class, Boolean> interfaceTypes = new HashMap();
+    private HashMap<Class, String> graphQLTypes = new HashMap();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
-    protected GraphQLOutputType createSchemaClassName(Class clazz) {
-        assert(clazz != null);
+    protected String createSchemaClassName(final Class clazz) {
+        assert (clazz != null);
 
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
-            return javaTypesToGraphqlTypes.get(clazz.getSimpleName());
+            return javaTypesToGraphqlTypes.get(clazz.getSimpleName()).getName();
         }
 
-        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
+        final boolean isInterface = Modifier.isInterface(clazz.getModifiers())
+                || Modifier.isAbstract(clazz.getModifiers());
 
         // interfaces are never exported, so handle them seperately
         if (isInterface) {
@@ -157,19 +118,20 @@ public class Builders {
         } else {
             try {
                 MODEL_BUILDER.get(clazz);
-            } catch (org.kohsuke.stapler.export.NotExportableException e) {
-                return Scalars.GraphQLString;
+            } catch (final org.kohsuke.stapler.export.NotExportableException e) {
+                return Scalars.GraphQLString.getName();
             }
         }
         classQueue.add(clazz);
-        return GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz));
+        return ClassUtils.getGraphQLClassName(clazz);
     }
 
-    private Class getCollectionClass(Property p) {
-        return TypeUtil.erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
+    private Class getCollectionClass(final Property p) {
+        return TypeUtil
+                .erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
     }
 
-    private void buildSchemaFromClass(Class<?> clazz) {
+    private void buildSchemaFromClass(final Class<?> clazz) {
         if (graphQLTypes.containsKey(clazz)) {
             return;
         }
@@ -181,49 +143,48 @@ public class Builders {
         boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
         try {
             MODEL_BUILDER.get(clazz);
-        } catch (org.kohsuke.stapler.export.NotExportableException e) {
+        } catch (final org.kohsuke.stapler.export.NotExportableException e) {
             isInterface = true;
         }
 
-        if (isInterface) {
-            /* make mock class */
-            GraphqlTypeBuilderWrapper mockClassFieldBuilder = buildGraphQLTypeFromModel(clazz, false);
-            mockClassFieldBuilder.name(ClassUtils.getGraphQLClassName(clazz) + "__");
-            mockClassFieldBuilder.description("Generic implementation of " + clazz.getSimpleName() + " with just _class defined");
-            makeClassIdDefintion(clazz, mockClassFieldBuilder);
-            mockClassFieldBuilder.withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz)));
-            mockGraphQLTypes.put(ClassUtils.getGraphQLClassName(clazz) + "__", mockClassFieldBuilder);
-        }
+        interfaceTypes.put(clazz, isInterface);
         graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz, isInterface));
     }
 
-    static boolean shouldIgnoreClass(Class clazz) {
+    static boolean shouldIgnoreClass(final Class clazz) {
         return clazz.isAnnotationPresent(NoExternalUse.class) || clazz.isAnonymousClass();
     }
 
     @SuppressWarnings("squid:S135")
-    GraphqlTypeBuilderWrapper buildGraphQLTypeFromModel(Class clazz, boolean isInterface) {
-        Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class)null, (String)null);
+    String buildGraphQLTypeFromModel(final Class clazz, final boolean isInterface) {
+        final Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class) null, (String) null);
+        final Set<String> fields = new HashSet();
 
-        GraphqlTypeBuilderWrapper typeBuilder = new GraphqlTypeBuilderWrapper(
-            isInterface ? GraphQLInterfaceType.newInterface() : GraphQLObjectType.newObject()
-        );
+        final StringBuilder sb = new StringBuilder();
 
-        Jenkins instance = Jenkins.getInstanceOrNull();
+        final Jenkins instance = Jenkins.getInstanceOrNull();
         if (instance != null) {
-            Descriptor descriptor = instance.getDescriptor(clazz);
+            final Descriptor descriptor = instance.getDescriptor(clazz);
             if (descriptor != null) {
-                typeBuilder.description(descriptor.getDisplayName());
+                sb.append("\"" + descriptor.getDisplayName() + "\"\n");
             }
         }
 
-        typeBuilder.name(ClassUtils.getGraphQLClassName(clazz));
-
-        typeBuilder.field(makeClassFieldDefinition());
-        makeClassIdDefintion(clazz, typeBuilder);
+        if (isInterface) {
+            sb.append("interface ");
+        } else {
+            sb.append("type ");
+        }
+        sb.append(ClassUtils.getGraphQLClassName(clazz));
+        sb.append("%s {\n");
+        sb.append("  \"Class Name\"\n");
+        sb.append("  _class: String\n");
+        // .dataFetcher(dataFetcher ->
+        // ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getName())
+        sb.append(makeClassIdDefintion(clazz));
 
         if (model != null) {
-            ArrayList<Model<?>> queue = new ArrayList<>();
+            final ArrayList<Model<?>> queue = new ArrayList<>();
             queue.add(model);
 
             Model<?> superModel = model.superModel;
@@ -232,98 +193,87 @@ public class Builders {
                 superModel = superModel.superModel;
             }
 
-            for (Model<?> _model : queue) {
-                for (Property p : _model.getProperties()) {
-                    if (typeBuilder.hasField(p.name)) {
+            for (final Model<?> _model : queue) {
+                for (final Property p : _model.getProperties()) {
+                    if (fields.contains(p.name)) {
                         continue;
                     }
-                    Class propertyClazz = p.getType();
+                    final Class propertyClazz = p.getType();
 
-                    GraphQLOutputType className;
+                    String className;
                     if ("id".equals(p.name)) {
                         continue; /// we handle it in a different way
                     } else if (propertyClazz.isArray()) {
-                        className = GraphQLList.list(createSchemaClassName(propertyClazz.getComponentType()));
+                        className = "[" + createSchemaClassName(propertyClazz.getComponentType()) + "]";
                     } else if (Collection.class.isAssignableFrom(propertyClazz)) {
-                        className = GraphQLList.list(createSchemaClassName(getCollectionClass(p)));
+                        className = "[" + createSchemaClassName(getCollectionClass(p)) + "]";
                     } else {
                         className = createSchemaClassName(propertyClazz);
                     }
 
-                    GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition()
-                        .name(p.name)
-                        .type(className)
-                        .dataFetcher(dataFetchingEnvironment -> p.getValue(dataFetchingEnvironment.getSource()));
+                    // .dataFetcher(dataFetchingEnvironment ->
+                    // p.getValue(dataFetchingEnvironment.getSource()));
 
-                    if (className instanceof GraphQLList) {
-                        fieldBuilder.dataFetcher(dataFetchingEnvironment -> {
-                            int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
-                            int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
-                            String id = dataFetchingEnvironment.getArgument(ARG_ID);
-
-                            List<?> valuesList;
-                            Object values = p.getValue(dataFetchingEnvironment.getSource());
-                            if (values instanceof List) {
-                                valuesList = ((List<?>) values);
-                            } else {
-                                valuesList = Arrays.asList((Object[]) values);
-
-                            }
-                            if (id != null && !id.isEmpty()) {
-                                for (Object value : valuesList) {
-                                    Method method = IdFinder.idMethod(value.getClass());
-                                    if (method == null) {
-                                        continue;
-                                    }
-
-                                    String objectId = String.valueOf(method.invoke(value));
-                                    if (id.equals(objectId)) {
-                                        return Stream.of(value)
-                                            .filter(StreamUtils::isAllowed)
-                                            .toArray();
-                                    }
-                                }
-                                return null;
-                            }
-
-                            return Lists.newArrayList(slice(valuesList, offset, limit))
-                                .stream()
-                                .filter(StreamUtils::isAllowed)
-                                .toArray();
-                        });
-                        fieldBuilder.argument(GraphQLArgument.newArgument()
-                            .name(ARG_OFFSET)
-                            .type(Scalars.GraphQLInt)
-                            .defaultValue(0)
-                        )
-                            .argument(GraphQLArgument.newArgument()
-                                .name(ARG_LIMIT)
-                                .type(Scalars.GraphQLInt)
-                                .defaultValue(100)
-                            )
-                            .argument(GraphQLArgument.newArgument()
-                                .name(ARG_TYPE)
-                                .type(Scalars.GraphQLString)
-                            )
-                            .argument(GraphQLArgument.newArgument()
-                                .name(ARG_ID)
-                                .type(Scalars.GraphQLID)
-                            );
+                    if (StringUtils.isNotEmpty(p.getJavadoc())) {
+                        sb.append("  \"\"\"\n");
+                        // indent with 2 spaces
+                        sb.append(p.getJavadoc().replaceAll("(?m)^", "  "));
+                        sb.append("\n  \"\"\"\n");
                     }
-                    typeBuilder.field(fieldBuilder.build());
+                    sb.append("  ");
+                    sb.append(p.name);
+                    sb.append(": ");
+                    sb.append(className);
+                    sb.append("\n");
+
+                    /*
+                     * if (className instanceof GraphQLList) {
+                     * fieldBuilder.dataFetcher(dataFetchingEnvironment -> { final int offset =
+                     * dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET); final int limit =
+                     * dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT); final String id =
+                     * dataFetchingEnvironment.getArgument(ARG_ID);
+                     *
+                     * List<?> valuesList; final Object values =
+                     * p.getValue(dataFetchingEnvironment.getSource()); if (values instanceof List)
+                     * { valuesList = ((List<?>) values); } else { valuesList =
+                     * Arrays.asList((Object[]) values);
+                     *
+                     * } if (id != null && !id.isEmpty()) { for (final Object value : valuesList) {
+                     * final Method method = IdFinder.idMethod(value.getClass()); if (method ==
+                     * null) { continue; }
+                     *
+                     * final String objectId = String.valueOf(method.invoke(value)); if
+                     * (id.equals(objectId)) { return Stream.of(value)
+                     * .filter(StreamUtils::isAllowed) .toArray(); } } return null; }
+                     *
+                     * return Lists.newArrayList(slice(valuesList, offset, limit)) .stream()
+                     * .filter(StreamUtils::isAllowed) .toArray(); });
+                     * fieldBuilder.argument(GraphQLArgument.newArgument() .name(ARG_OFFSET)
+                     * .type(Scalars.GraphQLInt) .defaultValue(0) )
+                     * .argument(GraphQLArgument.newArgument() .name(ARG_LIMIT)
+                     * .type(Scalars.GraphQLInt) .defaultValue(100) )
+                     * .argument(GraphQLArgument.newArgument() .name(ARG_TYPE)
+                     * .type(Scalars.GraphQLString) ) .argument(GraphQLArgument.newArgument()
+                     * .name(ARG_ID) .type(Scalars.GraphQLID) ); }
+                     */
+                    fields.add(p.name);
                 }
             }
         }
-        return typeBuilder;
+        sb.append("}\n");
+        return sb.toString();
     }
 
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
-        GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
+        Pattern typeToInterface = Pattern.compile("^type ", Pattern.MULTILINE);
+        final HashMap<String, Property> propertyMap = new HashMap<>();
 
-        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
-        queryType.field(buildAllQuery(User.class));
-        queryType.field(buildActionQuery(WhoAmI.class));
+//        final GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
+//
+//        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
+//        queryType.field(buildAllQuery(User.class));
+//        queryType.field(buildActionQuery(WhoAmI.class));
 
         classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
@@ -331,185 +281,225 @@ public class Builders {
         classQueue.addAll(this.extraTopLevelClasses);
 
         while (!classQueue.isEmpty()) {
-            Class clazz = classQueue.poll();
-            if (clazz == Object.class || clazz == Class.class) { continue; }
+            final Class clazz = classQueue.poll();
+            if (clazz == Object.class || clazz == Class.class) {
+                continue;
+            }
             this.buildSchemaFromClass(clazz);
         }
 
-        HashSet<GraphQLType> types = new HashSet<>();
-        GraphQLCodeRegistry.Builder codeRegistry = GraphQLCodeRegistry.newCodeRegistry();
-
-        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
-            if (!interfaceClazz.getValue().isInterface()) {
-                continue;
-            }
-            LOGGER.info("Interface:" + interfaceClazz.getValue().getName());
-            codeRegistry.typeResolver(interfaceClazz.getValue().getName(), buildTypeResolver());
+        StringBuilder sb = new StringBuilder();
+        for (GraphQLScalarType type : new HashSet<GraphQLScalarType>(javaTypesToGraphqlTypes.values())) {
+            sb.append("scalar " + type.getName() + "\n");
         }
 
-        for (Map.Entry<Class, GraphqlTypeBuilderWrapper> interfaceClazz : this.graphQLTypes.entrySet()) {
-            if (!interfaceClazz.getValue().isInterface()) {
-                continue;
+        sb.append("\n");
+
+        for (Class<?> interfaceClazz : this.graphQLTypes.keySet()) {
+            List<String> interfaces = new LinkedList<>();
+            if (!interfaceClazz.isInterface()) {
+                for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
+                    Class<?> instanceClazz = entry1.getKey();
+                    //^(type|instance)
+                    if (interfaceClazz == instanceClazz) {
+                        continue;
+                    }
+                    if (instanceClazz.isAssignableFrom(interfaceClazz)) {
+                        // if we "implement" it, then its now an interface
+                        this.graphQLTypes.put(
+                            entry1.getKey(),
+                            typeToInterface.matcher(entry1.getValue()).replaceFirst("interface ")
+                        );
+                        interfaces.add(ClassUtils.getGraphQLClassName(instanceClazz));
+                    }
+                }
             }
-            for (Map.Entry<Class, GraphqlTypeBuilderWrapper> instanceClazz : this.graphQLTypes.entrySet()) {
-                if (instanceClazz.getValue().isInterface()) {
-                    continue;
-                }
-                if (interfaceClazz.getKey() != instanceClazz.getKey() && interfaceClazz.getKey().isAssignableFrom(instanceClazz.getKey())) {
-                    this.graphQLTypes.get(instanceClazz.getKey()).withInterface(GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(interfaceClazz.getKey())));
-                }
+            if (interfaces.size() > 0) {
+                this.graphQLTypes.put(
+                    interfaceClazz,
+                    String.format(
+                        this.graphQLTypes.get(interfaceClazz),
+                        " implements " + String.join(" & ", interfaces)
+                    )
+                );
+            } else {
+                this.graphQLTypes.put(
+                    interfaceClazz,
+                    String.format(this.graphQLTypes.get(interfaceClazz), "")
+                );
             }
         }
 
-        types.addAll(
-            Stream.concat(
-                this.graphQLTypes.values().stream(),
-                this.mockGraphQLTypes.values().stream()
-            )
-                .filter(distinctByKey(GraphqlTypeBuilderWrapper::getName))
-                .map(GraphqlTypeBuilderWrapper::build)
-                .collect(Collectors.toList())
+        sb.append(
+            this.graphQLTypes.values().stream()
+                .map( Object::toString )
+                .collect( Collectors.joining( "\n\n" ) )
         );
 
+        sb.append("\n");
+        sb.append("schema {\n");
+        sb.append("  query: QueryType\n");
+        sb.append("}\n");
+
+        sb.append("type QueryType {\n");
+        sb.append("  allItems(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
+        sb.append("  allUsers(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
+        // sb.append("  whoami: " + ClassUtils.getGraphQLClassName(WhoAmI.class)+ "\n");
+        sb.append("}\n");
+
+        try {
+            Files.write(sb.toString().getBytes(), Paths.get("./graphql.schema").toFile());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        System.out.println("sdl: " + sb.toString());
+        TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(sb.toString());
+        RuntimeWiring.Builder runtimeWiring = RuntimeWiring.newRuntimeWiring();
+        runtimeWiring.type("QueryType", new UnaryOperator<TypeRuntimeWiring.Builder>() {
+            @Override
+            public TypeRuntimeWiring.Builder apply(TypeRuntimeWiring.Builder builder) {
+                return builder
+                    .dataFetcher("allItems", getObjectDataFetcher(AbstractItem.class))
+                    .dataFetcher("allUsers", getObjectDataFetcher(User.class));
+            }
+        });
+        runtimeWiring.wiringFactory(new WiringFactory() {
+            @Override
+            public boolean providesScalar(ScalarWiringEnvironment environment) {
+                for (GraphQLScalarType type : javaTypesToGraphqlTypes.values()) {
+                    if (environment.getScalarTypeDefinition().getName().equals(type.getName())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public GraphQLScalarType getScalar(ScalarWiringEnvironment environment) {
+                for (GraphQLScalarType type : javaTypesToGraphqlTypes.values()) {
+                    if (environment.getScalarTypeDefinition().getName().equals(type.getName())) {
+                        return type;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean providesTypeResolver(InterfaceWiringEnvironment environment) {
+                return true;
+            }
+
+            @Override
+            public TypeResolver getTypeResolver(InterfaceWiringEnvironment environment) {
+                return new TypeResolver() {
+                    @Override
+                    public GraphQLObjectType getType(TypeResolutionEnvironment env) {
+                        Object javaObject = env.getObject();
+                        return env.getSchema().getObjectType(ClassUtils.getGraphQLClassName(javaObject.getClass()));
+                    }
+                };
+            }
+
+            @Override
+            public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
+                FieldDefinition fieldDef = environment.getFieldDefinition();
+                if ("_class".equals(fieldDef.getName())) {
+                    return true;
+                }
+                // return true;
+                String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+                return propertyMap.containsKey(name);
+            }
+
+            @Override
+            public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
+                return environment1 -> new DataFetcher<T>() {
+                    @Override
+                    public T get(DataFetchingEnvironment environment1) throws Exception {
+                        FieldDefinition fieldDef = environment.getFieldDefinition();
+                        if ("_class".equals(fieldDef.getName())) {
+                            return (T) environment1.getSource().getClass().getName();
+                        }
+                        String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
+                        return (T) propertyMap.get(name).getValue(environment1.getSource());
+                    }
+                };
+            }
+        });
+        SchemaGenerator schemaGenerator = new SchemaGenerator();
+
         this.graphQLTypes = null;
-        this.mockGraphQLTypes = null;
         this.classQueue = null;
         this.extraTopLevelClasses = null;
 
-        return GraphQLSchema.newSchema()
-            .query(queryType.build())
-            .codeRegistry(codeRegistry.build())
-            .additionalTypes(types)
-            .additionalType(ExtendedScalars.DateTime)
-            .additionalType(AdditionalScalarTypes.GregrianCalendarScalar)
-            .build();
+        return schemaGenerator.makeExecutableSchema(typeRegistry, runtimeWiring.build());
+
+        // private RuntimeWiring buildWiring() {
+        //     return RuntimeWiring.newRuntimeWiring()
+        //             .type(newTypeWiring("Query")
+        //                     .dataFetcher("bookById", graphQLDataFetchers.getBookByIdDataFetcher()))
+        //             .type(newTypeWiring("Book")
+        //                     .dataFetcher("author", graphQLDataFetchers.getAuthorDataFetcher()))
+        //             .build();
+        // }
+        // return GraphQLSchema.newSchema()
+        //     .query(queryType.build())
+        //     .codeRegistry(codeRegistry.build())
+        //     .additionalTypes(types)
+        //     .additionalType(ExtendedScalars.DateTime)
+        //     .additionalType(AdditionalScalarTypes.GregrianCalendarScalar)
+        //     .build();
     }
 
-    private TypeResolver buildTypeResolver() {
-        return env -> {
-            Class realClazz = ClassUtils.getRealClass(env.getObject().getClass());
-            String name = ClassUtils.getGraphQLClassName(realClazz);
-            LOGGER.log(Level.INFO, "Attempting to find: {0}", name);
-            if (env.getSchema().getObjectType(name) != null) {
-                return env.getSchema().getObjectType(name);
+    private DataFetcher<Object> getObjectDataFetcher(Class<?> defaultClazz) {
+        return dataFetchingEnvironment -> {
+            Class clazz = defaultClazz;
+            final Jenkins instance = Jenkins.getInstanceOrNull();
+            final int offset = dataFetchingEnvironment.<Integer>getArgumentOrDefault(ARG_OFFSET, 0);
+            final int limit = dataFetchingEnvironment.<Integer>getArgumentOrDefault(ARG_LIMIT, 100);
+            final String clazzName = dataFetchingEnvironment.getArgumentOrDefault(ARG_TYPE, "");
+            final String id = dataFetchingEnvironment.getArgumentOrDefault(ARG_ID, null);
+
+            if (clazzName != null && !clazzName.isEmpty()) {
+                clazz = Class.forName(clazzName);
             }
 
-            // FIXME - I think i started this earlier to find the right impl, but then forgot about it
-            // should probably ignore ones starting with __
-            // find where name == graphqlname(class)
-            // fall through to the __ one
-            // maybe, cause that only checks the impls that match the subclass exactly
-//                List<GraphQLType> impls = env.getSchema().getTypeMap()
-//                    .values()
-//                    .stream()
-//                    .filter(i -> i instanceof GraphQLObjectType && ((GraphQLObjectType) i).getInterfaces().contains(env.getFieldType()))
-//                    .collect(Collectors.toList());
-            for (Class subclassClazz : ClassUtils.getAllSuperClasses(realClazz)) {
-                name = ClassUtils.getGraphQLClassName(subclassClazz) + "__";
-                LOGGER.log(Level.INFO, "Attempting to find subclass: {0}", name);
-                GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                if (objectType != null) {
-                    return objectType;
+            Iterable iterable;
+            if (clazz == User.class) {
+                if (id != null && !id.isEmpty()) {
+                    return Stream.of(User.get(id, false, Collections.emptyMap()))
+                        .filter(Objects::nonNull)
+                        .filter(StreamUtils::isAllowed)
+                        .toArray();
                 }
-            }
-            for (Class interfaceClazz : ClassUtils.getAllInterfaces(realClazz)) {
-                name = ClassUtils.getGraphQLClassName(interfaceClazz) + "__";
-                LOGGER.log(Level.INFO, "Attempting to find interface: {0}", name);
-                GraphQLObjectType objectType = env.getSchema().getObjectType(name);
-                if (objectType != null && objectType.getInterfaces().contains(env.getFieldType())) {
-                    return objectType;
+                iterable = User.getAll();
+            } else {
+                if (id != null && !id.isEmpty()) {
+                    if (instance == null) {
+                        LOGGER.log(Level.SEVERE, "Jenkins.getInstanceOrNull() is null, panic panic die die");
+                        return null;
+                    }
+                    return Stream.of(instance.getItemByFullName(id))
+                        .filter(Objects::nonNull)
+                        .filter(StreamUtils::isAllowed)
+                        .toArray();
                 }
+
+                iterable = Items.allItems(
+                    Jenkins.getAuthentication(),
+                    Jenkins.getInstanceOrNull(),
+                    clazz
+                );
             }
-            return null;
+            return Lists.newArrayList(slice(iterable, offset, limit))
+                .stream()
+                .filter(StreamUtils::isAllowed)
+                .toArray();
         };
     }
 
-    private GraphQLInterfaceType convertToInterface(GraphQLObjectType objectType) {
-        GraphQLInterfaceType.Builder interfaceType = GraphQLInterfaceType.newInterface();
-        interfaceType.name(objectType.getName());
-        interfaceType.description(objectType.getDescription());
-        for (GraphQLFieldDefinition fieldDefinition : objectType.getFieldDefinitions()) {
-            interfaceType.field(fieldDefinition);
-        }
-        for (GraphQLDirective directive: objectType.getDirectives()) {
-            interfaceType.withDirective(directive);
-        }
-        return interfaceType.build();
-    }
-
-    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz) {
-        return buildAllQuery(defaultClazz, "all" + defaultClazz.getSimpleName() + "s");
-    }
-
-    public GraphQLFieldDefinition.Builder buildAllQuery( Class<?> defaultClazz, String fieldName) {
-        return GraphQLFieldDefinition.newFieldDefinition()
-            .name(fieldName)
-            .type(GraphQLList.list(createSchemaClassName(defaultClazz)))
-            .argument(GraphQLArgument.newArgument()
-                .name(ARG_OFFSET)
-                .type(Scalars.GraphQLInt)
-                .defaultValue(0)
-            )
-            .argument(GraphQLArgument.newArgument()
-                .name(ARG_LIMIT)
-                .type(Scalars.GraphQLInt)
-                .defaultValue(100)
-            )
-            .argument(GraphQLArgument.newArgument()
-                .name(ARG_TYPE)
-                .type(Scalars.GraphQLString)
-            )
-            .argument(GraphQLArgument.newArgument()
-                .name(ARG_ID)
-                .type(Scalars.GraphQLID)
-            )
-            .dataFetcher(dataFetchingEnvironment -> {
-                Class clazz = defaultClazz;
-                Jenkins instance = Jenkins.getInstanceOrNull();
-                int offset = dataFetchingEnvironment.<Integer>getArgument(ARG_OFFSET);
-                int limit = dataFetchingEnvironment.<Integer>getArgument(ARG_LIMIT);
-                String clazzName = dataFetchingEnvironment.getArgument(ARG_TYPE);
-                String id = dataFetchingEnvironment.getArgument(ARG_ID);
-
-                if (clazzName != null && !clazzName.isEmpty()) {
-                    clazz = Class.forName(clazzName);
-                }
-
-                Iterable iterable;
-                if (clazz == User.class) {
-                    if (id != null && !id.isEmpty()) {
-                        return Stream.of(User.get(id, false, Collections.emptyMap()))
-                            .filter(Objects::nonNull)
-                            .filter(StreamUtils::isAllowed)
-                            .toArray();
-                    }
-                    iterable = User.getAll();
-                } else {
-                    if (id != null && !id.isEmpty()) {
-                        if (instance == null) {
-                            LOGGER.log(Level.SEVERE, "Jenkins.getInstanceOrNull() is null, panic panic die die");
-                            return null;
-                        }
-                        return Stream.of(instance.getItemByFullName(id))
-                            .filter(Objects::nonNull)
-                            .filter(StreamUtils::isAllowed)
-                            .toArray();
-                    }
-
-                    iterable = Items.allItems(
-                        Jenkins.getAuthentication(),
-                        Jenkins.getInstanceOrNull(),
-                        clazz
-                    );
-                }
-                return Lists.newArrayList(slice(iterable, offset, limit))
-                    .stream()
-                    .filter(StreamUtils::isAllowed)
-                    .toArray();
-            });
-    }
-
-    private GraphQLFieldDefinition buildActionQuery(Class<? extends Action> actionClazz) {
+    private GraphQLFieldDefinition buildActionQuery(final Class<? extends Action> actionClazz) {
         Action action;
         try {
             action = actionClazz.newInstance();
@@ -519,12 +509,12 @@ public class Builders {
 
         return GraphQLFieldDefinition.newFieldDefinition()
             .name(action.getUrlName())
-            .type(createSchemaClassName(actionClazz))
+            .type(GraphQLTypeReference.typeRef(createSchemaClassName(actionClazz)))
             .dataFetcher(new StaticDataFetcher(action))
             .build();
     }
 
-    public void addExtraTopLevelClasses(List<Class> clazzes) {
+    public void addExtraTopLevelClasses(final List<Class> clazzes) {
         this.extraTopLevelClasses.addAll(clazzes);
     }
 }

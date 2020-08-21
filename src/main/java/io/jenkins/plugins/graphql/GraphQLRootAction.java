@@ -112,6 +112,8 @@ public class GraphQLRootAction extends Actionable implements RootAction {
             rsp.setStatus(HttpServletResponse.SC_OK);
             return;
         }
+        // GraphQLSchema graphQLSchema = buildSchema(sdl);
+        // this.graphQL = GraphQL.newGraphQL(graphQLSchema).build();
 
         ServletOutputStream outputStream = rsp.getOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(outputStream, "UTF-8");

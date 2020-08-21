@@ -3,6 +3,9 @@ package io.jenkins.plugins.graphql;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLTypeReference;
+import graphql.schema.idl.SchemaParser;
+import graphql.schema.idl.TypeDefinitionRegistry;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.kohsuke.stapler.export.Exported;
@@ -26,19 +29,23 @@ public class BuildersTest {
     public void buildObjectForArray() {
         Builders builders = new Builders() {
             @Override
-            protected GraphQLOutputType createSchemaClassName(Class clazz) {
-                return GraphQLTypeReference.typeRef(ClassUtils.getGraphQLClassName(clazz));
+            protected String createSchemaClassName(Class clazz) {
+                return ClassUtils.getGraphQLClassName(clazz);
             }
         };
 
-        GraphQLObjectType graphQLObjectType = (GraphQLObjectType) builders.buildGraphQLTypeFromModel(TestExportedClass.class, false).build();
+        TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(
+            builders.buildGraphQLTypeFromModel(TestExportedClass.class, false)
+        );
+
+        GraphQLObjectType graphQLObjectType = (GraphQLObjectType) typeRegistry.getType("TestExportedClass").get();
         Assert.assertEquals(
             null,
             graphQLObjectType.getDescription()
         );
         Assert.assertEquals(
             "java_lang_String",
-            graphQLObjectType.getFieldDefinition("string").getType().getName()
+            graphQLObjectType.getFieldDefinition("string").getType().toString()
         );
         Assert.assertEquals(
             "[java_lang_String]",
