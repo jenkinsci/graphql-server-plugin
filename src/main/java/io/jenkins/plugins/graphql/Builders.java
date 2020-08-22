@@ -20,6 +20,7 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -99,6 +100,7 @@ public class Builders {
     /*** DONE STATIC */
     private HashMap<Class, Boolean> interfaceTypes = new HashMap();
     private HashMap<Class, String> graphQLTypes = new HashMap();
+    private HashMap<String, Property> propertyMap = new HashMap<>();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
     private List<Class> extraTopLevelClasses = new ArrayList<>();
 
@@ -158,7 +160,7 @@ public class Builders {
     @SuppressWarnings("squid:S135")
     String buildGraphQLTypeFromModel(final Class clazz, final boolean isInterface) {
         final Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class) null, (String) null);
-        final Set<String> fields = new HashSet();
+        String containerTypeName = ClassUtils.getGraphQLClassName(clazz);
 
         final StringBuilder sb = new StringBuilder();
 
@@ -175,12 +177,10 @@ public class Builders {
         } else {
             sb.append("type ");
         }
-        sb.append(ClassUtils.getGraphQLClassName(clazz));
+        sb.append(containerTypeName);
         sb.append("%s {\n");
         sb.append("  \"Class Name\"\n");
         sb.append("  _class: String\n");
-        // .dataFetcher(dataFetcher ->
-        // ClassUtils.getRealClass(dataFetcher.getSource().getClass()).getName())
         sb.append(makeClassIdDefintion(clazz));
 
         if (model != null) {
@@ -195,7 +195,7 @@ public class Builders {
 
             for (final Model<?> _model : queue) {
                 for (final Property p : _model.getProperties()) {
-                    if (fields.contains(p.name)) {
+                    if (this.propertyMap.containsKey(containerTypeName + "#" + p.name)) {
                         continue;
                     }
                     final Class propertyClazz = p.getType();
@@ -224,6 +224,9 @@ public class Builders {
                     sb.append(p.name);
                     sb.append(": ");
                     sb.append(className);
+                    if (propertyClazz.isAnnotationPresent(Nonnull.class)) {
+                        sb.append("!");
+                    }
                     sb.append("\n");
 
                     /*
@@ -256,7 +259,7 @@ public class Builders {
                      * .type(Scalars.GraphQLString) ) .argument(GraphQLArgument.newArgument()
                      * .name(ARG_ID) .type(Scalars.GraphQLID) ); }
                      */
-                    fields.add(p.name);
+                    propertyMap.put(containerTypeName + "#" + p.name, p);
                 }
             }
         }
@@ -267,8 +270,6 @@ public class Builders {
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
         Pattern typeToInterface = Pattern.compile("^type ", Pattern.MULTILINE);
-        final HashMap<String, Property> propertyMap = new HashMap<>();
-
 //        final GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
 //
 //        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
@@ -300,7 +301,6 @@ public class Builders {
             if (!interfaceClazz.isInterface()) {
                 for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
                     Class<?> instanceClazz = entry1.getKey();
-                    //^(type|instance)
                     if (interfaceClazz == instanceClazz) {
                         continue;
                     }
@@ -407,7 +407,6 @@ public class Builders {
                 if ("_class".equals(fieldDef.getName())) {
                     return true;
                 }
-                // return true;
                 String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
                 return propertyMap.containsKey(name);
             }
