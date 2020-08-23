@@ -362,7 +362,7 @@ public class Builders {
         sb.append("}\n");
 
         try {
-            Files.write(sb.toString().getBytes(), Paths.get("./graphql.schema").toFile());
+            Files.write(sb.toString().getBytes(), Paths.get("./schema.graphql").toFile());
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

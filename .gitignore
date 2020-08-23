@@ -54,4 +54,4 @@ src/main/webapp/js/script.css
 src/main/webapp/js/script.css.map
 .cache/
 node/
-graphql.schema
+schema.graphql
