@@ -367,7 +367,6 @@ public class Builders {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        System.out.println("sdl: " + sb.toString());
 
         TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(sb.toString());
         RuntimeWiring.Builder runtimeWiring = RuntimeWiring.newRuntimeWiring();
