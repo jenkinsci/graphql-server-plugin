@@ -7,13 +7,15 @@ import com.google.common.io.Files;
 import graphql.Scalars;
 import graphql.TypeResolutionEnvironment;
 import graphql.language.FieldDefinition;
+import graphql.language.ListType;
 import graphql.schema.*;
 import graphql.schema.idl.*;
+import hudson.DescriptorExtensionList;
 import hudson.model.*;
-import hudson.security.WhoAmI;
 import io.jenkins.plugins.graphql.types.AdditionalScalarTypes;
 import jenkins.model.Jenkins;
 import org.apache.commons.lang.StringUtils;
+import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.stapler.export.Model;
 import org.kohsuke.stapler.export.ModelBuilder;
@@ -22,6 +24,7 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Paths;
@@ -267,15 +270,24 @@ public class Builders {
         return sb.toString();
     }
 
+    private String getFieldNameForRootAction(RootAction action) {
+        return action.getUrlName().replaceAll("-", "_").replaceAll("/", "_");
+    }
+
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
         Pattern typeToInterface = Pattern.compile("^type ", Pattern.MULTILINE);
-//        final GraphQLObjectType.Builder queryType = GraphQLObjectType.newObject().name("QueryType");
-//
-//        queryType.field(buildAllQuery(AbstractItem.class, "allItems"));
-//        queryType.field(buildAllQuery(User.class));
-//        queryType.field(buildActionQuery(WhoAmI.class));
 
+        List<RootAction> rootActions = DescriptorExtensionList
+            .lookup(RootAction.class)
+            .stream()
+            .filter(action -> action.getDisplayName() != null)
+            .filter(action -> MODEL_BUILDER.getOrNull(action.getClass(), null, null) != null)
+            .filter(action -> !Arrays.asList(action.getClass().getAnnotations()).contains(Restricted.class))
+            .collect(Collectors.toList());
+        for (RootAction action : rootActions) {
+            classQueue.add(action.getClass());
+        }
         classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
@@ -344,7 +356,9 @@ public class Builders {
         sb.append("type QueryType {\n");
         sb.append("  allItems(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
         sb.append("  allUsers(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
-        // sb.append("  whoami: " + ClassUtils.getGraphQLClassName(WhoAmI.class)+ "\n");
+        for (RootAction action : rootActions) {
+            sb.append("  " + getFieldNameForRootAction(action) + ": " + ClassUtils.getGraphQLClassName(action.getClass()) + "\n");
+        }
         sb.append("}\n");
 
         try {
@@ -354,14 +368,18 @@ public class Builders {
             e.printStackTrace();
         }
         System.out.println("sdl: " + sb.toString());
+
         TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(sb.toString());
         RuntimeWiring.Builder runtimeWiring = RuntimeWiring.newRuntimeWiring();
         runtimeWiring.type("QueryType", new UnaryOperator<TypeRuntimeWiring.Builder>() {
             @Override
             public TypeRuntimeWiring.Builder apply(TypeRuntimeWiring.Builder builder) {
-                return builder
-                    .dataFetcher("allItems", getObjectDataFetcher(AbstractItem.class))
-                    .dataFetcher("allUsers", getObjectDataFetcher(User.class));
+                builder.dataFetcher("allItems", getObjectDataFetcher(AbstractItem.class));
+                builder.dataFetcher("allUsers", getObjectDataFetcher(User.class));
+                for (RootAction action : rootActions) {
+                    builder.dataFetcher(getFieldNameForRootAction(action), new StaticDataFetcher(action));
+                }
+                return builder;
             }
         });
         runtimeWiring.wiringFactory(new WiringFactory() {
@@ -396,7 +414,25 @@ public class Builders {
                     @Override
                     public GraphQLObjectType getType(TypeResolutionEnvironment env) {
                         Object javaObject = env.getObject();
-                        return env.getSchema().getObjectType(ClassUtils.getGraphQLClassName(javaObject.getClass()));
+                        GraphQLType type = env.getSchema().getType(ClassUtils.getGraphQLClassName(javaObject.getClass()));
+                        if (type == null) { return null; }
+
+                        if (type instanceof GraphQLObjectType) {
+                            return (GraphQLObjectType) type;
+                        }
+                        if (type instanceof GraphQLInterfaceType) {
+                            List<GraphQLObjectType> implementations = env.getSchema().getImplementations((GraphQLInterfaceType) type);
+                            if (implementations.size() == 0) {
+                                return null;
+                            }
+                            return implementations.get(0);
+                        }
+                        return null;
+/*                        Arrays.asList(javaObject.getClass().getInterfaces())
+                            .stream()
+                            .map(i -> env.getSchema().getType(ClassUtils.getGraphQLClassName(i)))
+                            .filter(i -> i != null)
+                            .toArray();*/
                     }
                 };
             }
@@ -421,14 +457,35 @@ public class Builders {
                             return (T) environment1.getSource().getClass().getName();
                         }
                         String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                        return (T) propertyMap.get(name).getValue(environment1.getSource());
+                        T value = (T) propertyMap.get(name).getValue(environment1.getSource());
+                        if (value instanceof Collection) {
+                            return (T) ((Collection) value)
+                                .stream()
+                                .filter(i -> graphQLTypes.containsKey(i.getClass()))
+                                .collect(Collectors.toList());
+                        }
+                        return value;
+                        /*
+                        // if this field has no children, its safe to assume its a scalar and safe to assume
+                        if (fieldDef.getType().getChildren().size() == 0) {
+                            return value;
+                        }
+
+                        // if its class we ve created, then save to return
+                        if (graphQLTypes.containsKey(value.getClass())) {
+                            // return value
+                            return value;
+                        }
+                        // else its something we don't handle
+                        return null;
+                        */
                     }
                 };
             }
         });
         SchemaGenerator schemaGenerator = new SchemaGenerator();
 
-        this.graphQLTypes = null;
+        // this.graphQLTypes = null;
         this.classQueue = null;
         this.extraTopLevelClasses = null;
 
@@ -455,10 +512,10 @@ public class Builders {
         return dataFetchingEnvironment -> {
             Class clazz = defaultClazz;
             final Jenkins instance = Jenkins.getInstanceOrNull();
-            final int offset = dataFetchingEnvironment.<Integer>getArgumentOrDefault(ARG_OFFSET, 0);
-            final int limit = dataFetchingEnvironment.<Integer>getArgumentOrDefault(ARG_LIMIT, 100);
-            final String clazzName = dataFetchingEnvironment.getArgumentOrDefault(ARG_TYPE, "");
-            final String id = dataFetchingEnvironment.getArgumentOrDefault(ARG_ID, null);
+            final int offset = (int) dataFetchingEnvironment.getArguments().getOrDefault(ARG_OFFSET, 0);
+            final int limit = (int) dataFetchingEnvironment.getArguments().getOrDefault(ARG_LIMIT, 100);
+            final String clazzName = (String) dataFetchingEnvironment.getArguments().getOrDefault(ARG_TYPE, "");
+            final String id = (String) dataFetchingEnvironment.getArguments().getOrDefault(ARG_ID, null);
 
             if (clazzName != null && !clazzName.isEmpty()) {
                 clazz = Class.forName(clazzName);
@@ -496,21 +553,6 @@ public class Builders {
                 .filter(StreamUtils::isAllowed)
                 .toArray();
         };
-    }
-
-    private GraphQLFieldDefinition buildActionQuery(final Class<? extends Action> actionClazz) {
-        Action action;
-        try {
-            action = actionClazz.newInstance();
-        } catch (InstantiationException | IllegalAccessException e) {
-            return null;
-        }
-
-        return GraphQLFieldDefinition.newFieldDefinition()
-            .name(action.getUrlName())
-            .type(GraphQLTypeReference.typeRef(createSchemaClassName(actionClazz)))
-            .dataFetcher(new StaticDataFetcher(action))
-            .build();
     }
 
     public void addExtraTopLevelClasses(final List<Class> clazzes) {

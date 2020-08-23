@@ -45,6 +45,7 @@ const DEFAULT_QUERY = `# shift-option/alt-click on a query below to jump to it i
 # option/alt-click on a field in the explorer to select all subfields
 query allItems {
   allItems {
+    __typename
     name
     id
     _class
@@ -126,9 +127,7 @@ query allItems {
     anonymous
     authenticated
     authorities
-    details
     name
-    toString
   }
 }`;
 
