@@ -1,5 +1,6 @@
 package io.jenkins.plugins.graphql;
 
+import com.cloudbees.plugins.credentials.ViewCredentialsAction;
 import com.gargoylesoftware.htmlunit.HttpMethod;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.google.common.base.Charsets;
@@ -69,6 +70,7 @@ public class GraphQLSchemaGeneratorTest {
 
         Builders builder = new Builders();
         builder.addExtraTopLevelClasses(Collections.singletonList(FreeStyleProject.class));
+        builder.addExtraTopLevelClasses(Collections.singletonList(ViewCredentialsAction.class));
         graphQLSchema = builder.buildSchema();
         GraphQLRootAction.setBuiltSchema(graphQLSchema);
     }
@@ -206,17 +208,13 @@ public class GraphQLSchemaGeneratorTest {
         JSONObject data = postQuery(
             null,
             null,
-            "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
+            "query { whoAmI { authorities\nanonymous\nname\n } }"
         );
         JSONObject whoamiData = data.getJSONObject("whoAmI");
 
         assertArrayEquals(
             new String[] { "anonymous" },
             Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
-        );
-        assertEquals(
-            "null",
-            whoamiData.optString("details", "null")
         );
         assertEquals(
             true,
@@ -236,7 +234,7 @@ public class GraphQLSchemaGeneratorTest {
         JSONObject data = postQuery(
             "alice",
             "alice",
-            "query { whoAmI { authorities\ndetails\nanonymous\nname\n } }"
+            "query { whoAmI { authorities\nanonymous\nname\n } }"
         );
 
         JSONObject whoamiData = data.getJSONObject("whoAmI");
@@ -244,10 +242,6 @@ public class GraphQLSchemaGeneratorTest {
         assertArrayEquals(
             new String[] { "authenticated" },
             Lists.newArrayList(whoamiData.getJSONArray("authorities").iterator()).toArray()
-        );
-        assertEquals(
-            "org.acegisecurity.ui.WebAuthenticationDetails@957e: RemoteIpAddress: 127.0.0.1; SessionId: null",
-            whoamiData.optString("details", null)
         );
         assertEquals(
             false,

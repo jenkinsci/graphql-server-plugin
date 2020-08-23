@@ -1,5 +1,6 @@
 package io.jenkins.plugins.graphql;
 
+import graphql.language.*;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLOutputType;
 import graphql.schema.GraphQLTypeReference;
@@ -34,27 +35,30 @@ public class BuildersTest {
             }
         };
 
-        TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(
-            builders.buildGraphQLTypeFromModel(TestExportedClass.class, false)
-        );
+        String sdl = String.format(builders.buildGraphQLTypeFromModel(TestExportedClass.class, false), "");
+        TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(sdl);
 
-        GraphQLObjectType graphQLObjectType = (GraphQLObjectType) typeRegistry.getType("TestExportedClass").get();
+        ObjectTypeDefinition graphQLObjectType = (ObjectTypeDefinition) typeRegistry.getType(ClassUtils.getGraphQLClassName(TestExportedClass.class)).get();
         Assert.assertEquals(
             null,
             graphQLObjectType.getDescription()
         );
         Assert.assertEquals(
-            "java_lang_String",
-            graphQLObjectType.getFieldDefinition("string").getType().toString()
+            "TypeName{name='java_lang_String'}",
+            getFieldType(graphQLObjectType, "string").toString()
         );
         Assert.assertEquals(
-            "[java_lang_String]",
-            graphQLObjectType.getFieldDefinition("arrayString").getType().toString()
+            "ListType{type=TypeName{name='java_lang_String'}}",
+            getFieldType(graphQLObjectType, "arrayString").toString()
         );
         Assert.assertEquals(
-            "[java_lang_String]",
-            graphQLObjectType.getFieldDefinition("listString").getType().toString()
+            "ListType{type=TypeName{name='java_lang_String'}}",
+            getFieldType(graphQLObjectType, "listString").toString()
         );
+    }
+
+    private Type getFieldType(ObjectTypeDefinition graphQLObjectType, String key) {
+        return graphQLObjectType.getFieldDefinitions().stream().filter(i -> i.getName().equals(key)).findFirst().get().getType();
     }
 
     @Test

@@ -5,9 +5,6 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.io.Files;
 import graphql.Scalars;
-import graphql.TypeResolutionEnvironment;
-import graphql.language.FieldDefinition;
-import graphql.language.ListType;
 import graphql.schema.*;
 import graphql.schema.idl.*;
 import hudson.DescriptorExtensionList;
@@ -24,7 +21,6 @@ import org.kohsuke.stapler.export.TypeUtil;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Paths;
@@ -101,7 +97,6 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<Class, Boolean> interfaceTypes = new HashMap();
     private HashMap<Class, String> graphQLTypes = new HashMap();
     private HashMap<String, Property> propertyMap = new HashMap<>();
     private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
@@ -114,8 +109,7 @@ public class Builders {
             return javaTypesToGraphqlTypes.get(clazz.getSimpleName()).getName();
         }
 
-        final boolean isInterface = Modifier.isInterface(clazz.getModifiers())
-                || Modifier.isAbstract(clazz.getModifiers());
+        final boolean isInterface = isInterfaceOrAbstract(clazz);
 
         // interfaces are never exported, so handle them seperately
         if (isInterface) {
@@ -129,6 +123,11 @@ public class Builders {
         }
         classQueue.add(clazz);
         return ClassUtils.getGraphQLClassName(clazz);
+    }
+
+    private boolean isInterfaceOrAbstract(Class clazz) {
+        return Modifier.isInterface(clazz.getModifiers())
+            || Modifier.isAbstract(clazz.getModifiers());
     }
 
     private Class getCollectionClass(final Property p) {
@@ -145,14 +144,13 @@ public class Builders {
             return;
         }
 
-        boolean isInterface = Modifier.isInterface(clazz.getModifiers()) || Modifier.isAbstract(clazz.getModifiers());
+        boolean isInterface = isInterfaceOrAbstract(clazz);
         try {
             MODEL_BUILDER.get(clazz);
         } catch (final org.kohsuke.stapler.export.NotExportableException e) {
             isInterface = true;
         }
 
-        interfaceTypes.put(clazz, isInterface);
         graphQLTypes.put(clazz, buildGraphQLTypeFromModel(clazz, isInterface));
     }
 
@@ -171,7 +169,8 @@ public class Builders {
         if (instance != null) {
             final Descriptor descriptor = instance.getDescriptor(clazz);
             if (descriptor != null) {
-                sb.append("\"" + descriptor.getDisplayName() + "\"\n");
+                // TODO - make test to check for display names having quotes in them
+                sb.append("\"" + descriptor.getDisplayName().replaceAll("\"", "\\\\\"")  + "\"\n");
             }
         }
 
@@ -281,13 +280,26 @@ public class Builders {
         List<RootAction> rootActions = DescriptorExtensionList
             .lookup(RootAction.class)
             .stream()
-            .filter(action -> action.getDisplayName() != null)
+            // check to see if its exported
             .filter(action -> MODEL_BUILDER.getOrNull(action.getClass(), null, null) != null)
+            // check to see if it has a display name
+            .filter(action -> action.getDisplayName() != null)
+            // finally check to see if its restricted at all (Shouldn't be if exported)
             .filter(action -> !Arrays.asList(action.getClass().getAnnotations()).contains(Restricted.class))
             .collect(Collectors.toList());
         for (RootAction action : rootActions) {
             classQueue.add(action.getClass());
         }
+        classQueue.addAll(
+            DescriptorExtensionList
+                .lookup(Descriptor.class)
+                .stream()
+//                .map(i -> DescriptorExtensionList.lookup(i.getClass()))
+//                .flatMap(Collection::stream)
+                .map(i -> i.getKlass().toJavaClass())
+                .collect(Collectors.toList())
+        );
+        classQueue.addAll(Jenkins.getInstanceOrNull().getExtensionList(Action.class).stream().map(i -> i.getClass()).collect(Collectors.toList()));
         classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
@@ -354,8 +366,8 @@ public class Builders {
         sb.append("}\n");
 
         sb.append("type QueryType {\n");
-        sb.append("  allItems(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
-        sb.append("  allUsers(offset: Int, limit: Int, Type: String, ID: ID): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
+        sb.append("  allItems(offset: Int, limit: Int, Type: String, id: String): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
+        sb.append("  allUsers(offset: Int, limit: Int, Type: String, id: String): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
         for (RootAction action : rootActions) {
             sb.append("  " + getFieldNameForRootAction(action) + ": " + ClassUtils.getGraphQLClassName(action.getClass()) + "\n");
         }
@@ -381,130 +393,14 @@ public class Builders {
                 return builder;
             }
         });
-        runtimeWiring.wiringFactory(new WiringFactory() {
-            @Override
-            public boolean providesScalar(ScalarWiringEnvironment environment) {
-                for (GraphQLScalarType type : javaTypesToGraphqlTypes.values()) {
-                    if (environment.getScalarTypeDefinition().getName().equals(type.getName())) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            @Override
-            public GraphQLScalarType getScalar(ScalarWiringEnvironment environment) {
-                for (GraphQLScalarType type : javaTypesToGraphqlTypes.values()) {
-                    if (environment.getScalarTypeDefinition().getName().equals(type.getName())) {
-                        return type;
-                    }
-                }
-                return null;
-            }
-
-            @Override
-            public boolean providesTypeResolver(InterfaceWiringEnvironment environment) {
-                return true;
-            }
-
-            @Override
-            public TypeResolver getTypeResolver(InterfaceWiringEnvironment environment) {
-                return new TypeResolver() {
-                    @Override
-                    public GraphQLObjectType getType(TypeResolutionEnvironment env) {
-                        Object javaObject = env.getObject();
-                        GraphQLType type = env.getSchema().getType(ClassUtils.getGraphQLClassName(javaObject.getClass()));
-                        if (type == null) { return null; }
-
-                        if (type instanceof GraphQLObjectType) {
-                            return (GraphQLObjectType) type;
-                        }
-                        if (type instanceof GraphQLInterfaceType) {
-                            List<GraphQLObjectType> implementations = env.getSchema().getImplementations((GraphQLInterfaceType) type);
-                            if (implementations.size() == 0) {
-                                return null;
-                            }
-                            return implementations.get(0);
-                        }
-                        return null;
-/*                        Arrays.asList(javaObject.getClass().getInterfaces())
-                            .stream()
-                            .map(i -> env.getSchema().getType(ClassUtils.getGraphQLClassName(i)))
-                            .filter(i -> i != null)
-                            .toArray();*/
-                    }
-                };
-            }
-
-            @Override
-            public boolean providesDataFetcherFactory(FieldWiringEnvironment environment) {
-                FieldDefinition fieldDef = environment.getFieldDefinition();
-                if ("_class".equals(fieldDef.getName())) {
-                    return true;
-                }
-                String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                return propertyMap.containsKey(name);
-            }
-
-            @Override
-            public <T> DataFetcherFactory<T> getDataFetcherFactory(FieldWiringEnvironment environment) {
-                return environment1 -> new DataFetcher<T>() {
-                    @Override
-                    public T get(DataFetchingEnvironment environment1) throws Exception {
-                        FieldDefinition fieldDef = environment.getFieldDefinition();
-                        if ("_class".equals(fieldDef.getName())) {
-                            return (T) environment1.getSource().getClass().getName();
-                        }
-                        String name = environment.getParentType().getName() + "#" + environment.getFieldDefinition().getName();
-                        T value = (T) propertyMap.get(name).getValue(environment1.getSource());
-                        if (value instanceof Collection) {
-                            return (T) ((Collection) value)
-                                .stream()
-                                .filter(i -> graphQLTypes.containsKey(i.getClass()))
-                                .collect(Collectors.toList());
-                        }
-                        return value;
-                        /*
-                        // if this field has no children, its safe to assume its a scalar and safe to assume
-                        if (fieldDef.getType().getChildren().size() == 0) {
-                            return value;
-                        }
-
-                        // if its class we ve created, then save to return
-                        if (graphQLTypes.containsKey(value.getClass())) {
-                            // return value
-                            return value;
-                        }
-                        // else its something we don't handle
-                        return null;
-                        */
-                    }
-                };
-            }
-        });
+        runtimeWiring.wiringFactory(new JenkinsWireingFactory(javaTypesToGraphqlTypes, propertyMap));
         SchemaGenerator schemaGenerator = new SchemaGenerator();
 
-        // this.graphQLTypes = null;
+        this.graphQLTypes = null;
         this.classQueue = null;
         this.extraTopLevelClasses = null;
 
         return schemaGenerator.makeExecutableSchema(typeRegistry, runtimeWiring.build());
-
-        // private RuntimeWiring buildWiring() {
-        //     return RuntimeWiring.newRuntimeWiring()
-        //             .type(newTypeWiring("Query")
-        //                     .dataFetcher("bookById", graphQLDataFetchers.getBookByIdDataFetcher()))
-        //             .type(newTypeWiring("Book")
-        //                     .dataFetcher("author", graphQLDataFetchers.getAuthorDataFetcher()))
-        //             .build();
-        // }
-        // return GraphQLSchema.newSchema()
-        //     .query(queryType.build())
-        //     .codeRegistry(codeRegistry.build())
-        //     .additionalTypes(types)
-        //     .additionalType(ExtendedScalars.DateTime)
-        //     .additionalType(AdditionalScalarTypes.GregrianCalendarScalar)
-        //     .build();
     }
 
     private DataFetcher<Object> getObjectDataFetcher(Class<?> defaultClazz) {
