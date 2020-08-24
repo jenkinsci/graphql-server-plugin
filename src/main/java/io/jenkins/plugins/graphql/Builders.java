@@ -174,7 +174,11 @@ public class Builders {
             }
         }
 
-        sb.append("type ");
+        if (isInterface) {
+            sb.append("interface ");
+        } else {
+            sb.append("type ");
+        }
         sb.append(containerTypeName);
         sb.append("%s {\n");
         sb.append("  \"Class Name\"\n");
@@ -271,7 +275,7 @@ public class Builders {
 
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
-        Pattern typeToInterface = Pattern.compile("^type ([a-zA-Z0-9_]+)\\s*%s", Pattern.MULTILINE);
+        Pattern typeToInterface = Pattern.compile("^(?:type|interface) ([a-zA-Z0-9_]+)\\s*%s", Pattern.MULTILINE);
 
         List<RootAction> rootActions = DescriptorExtensionList
             .lookup(RootAction.class)
@@ -324,12 +328,11 @@ public class Builders {
                 if (interfaceClazz == instanceClazz) {
                     continue;
                 }
+                if (!isInterfaceOrAbstract(instanceClazz)) {
+                    continue;
+                }
                 if (instanceClazz.isAssignableFrom(interfaceClazz)) {
-                    // if we "implement" it, then its now an interface
-                    graphQLTypeStrings.add(
-                        typeToInterface.matcher(entry1.getValue()).replaceFirst("interface interface_$1")
-                    );
-                    interfaces.add("interface_" + ClassUtils.getGraphQLClassName(instanceClazz));
+                    interfaces.add(ClassUtils.getGraphQLClassName(instanceClazz));
                 }
             }
             if (interfaces.size() > 0) {
@@ -344,7 +347,6 @@ public class Builders {
                     String.format(this.graphQLTypes.get(interfaceClazz), "")
                 );
             }
-            continue;
         }
 
         sb.append(

@@ -122,6 +122,7 @@ public class ClassUtils {
             )
             .filterInputsBy(
                 new FilterBuilder()
+                    .excludePackage("io.jenkins.cli.shaded")
                     .includePackage("com.cloudbees")
                     .includePackage("hudson.model")
                     .includePackage("hudson.plugins")
