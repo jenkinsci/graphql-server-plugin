@@ -1,12 +1,9 @@
 package io.jenkins.plugins.graphql;
 
-import graphql.language.*;
-import graphql.schema.GraphQLObjectType;
-import graphql.schema.GraphQLOutputType;
-import graphql.schema.GraphQLTypeReference;
+import graphql.language.ObjectTypeDefinition;
+import graphql.language.Type;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.kohsuke.stapler.export.Exported;

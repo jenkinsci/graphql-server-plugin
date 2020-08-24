@@ -174,11 +174,7 @@ public class Builders {
             }
         }
 
-        if (isInterface) {
-            sb.append("interface ");
-        } else {
-            sb.append("type ");
-        }
+        sb.append("type ");
         sb.append(containerTypeName);
         sb.append("%s {\n");
         sb.append("  \"Class Name\"\n");
@@ -275,7 +271,7 @@ public class Builders {
 
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
-        Pattern typeToInterface = Pattern.compile("^type ", Pattern.MULTILINE);
+        Pattern typeToInterface = Pattern.compile("^type ([a-zA-Z0-9_]+)\\s*%s", Pattern.MULTILINE);
 
         List<RootAction> rootActions = DescriptorExtensionList
             .lookup(RootAction.class)
@@ -320,42 +316,39 @@ public class Builders {
 
         sb.append("\n");
 
+        Set<String> graphQLTypeStrings = new HashSet();
         for (Class<?> interfaceClazz : this.graphQLTypes.keySet()) {
             List<String> interfaces = new LinkedList<>();
-            if (!interfaceClazz.isInterface()) {
-                for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
-                    Class<?> instanceClazz = entry1.getKey();
-                    if (interfaceClazz == instanceClazz) {
-                        continue;
-                    }
-                    if (instanceClazz.isAssignableFrom(interfaceClazz)) {
-                        // if we "implement" it, then its now an interface
-                        this.graphQLTypes.put(
-                            entry1.getKey(),
-                            typeToInterface.matcher(entry1.getValue()).replaceFirst("interface ")
-                        );
-                        interfaces.add(ClassUtils.getGraphQLClassName(instanceClazz));
-                    }
+            for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
+                Class<?> instanceClazz = entry1.getKey();
+                if (interfaceClazz == instanceClazz) {
+                    continue;
+                }
+                if (instanceClazz.isAssignableFrom(interfaceClazz)) {
+                    // if we "implement" it, then its now an interface
+                    graphQLTypeStrings.add(
+                        typeToInterface.matcher(entry1.getValue()).replaceFirst("interface interface_$1")
+                    );
+                    interfaces.add("interface_" + ClassUtils.getGraphQLClassName(instanceClazz));
                 }
             }
             if (interfaces.size() > 0) {
-                this.graphQLTypes.put(
-                    interfaceClazz,
+                graphQLTypeStrings.add(
                     String.format(
                         this.graphQLTypes.get(interfaceClazz),
                         " implements " + String.join(" & ", interfaces)
                     )
                 );
             } else {
-                this.graphQLTypes.put(
-                    interfaceClazz,
+                graphQLTypeStrings.add(
                     String.format(this.graphQLTypes.get(interfaceClazz), "")
                 );
             }
+            continue;
         }
 
         sb.append(
-            this.graphQLTypes.values().stream()
+            graphQLTypeStrings.stream()
                 .map( Object::toString )
                 .collect( Collectors.joining( "\n\n" ) )
         );

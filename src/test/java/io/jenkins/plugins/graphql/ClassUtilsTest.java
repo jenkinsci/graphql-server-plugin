@@ -3,6 +3,7 @@ package io.jenkins.plugins.graphql;
 import hudson.model.Action;
 import hudson.model.CauseAction;
 import hudson.model.ModelObject;
+import hudson.model.queue.FoldableAction;
 import hudson.plugins.git.GitTagAction;
 import jenkins.model.RunAction2;
 import org.hamcrest.Matchers;
@@ -23,7 +24,8 @@ public class ClassUtilsTest {
             Matchers.containsInAnyOrder(
                 ModelObject.class,
                 RunAction2.class,
-                Action.class
+                Action.class,
+                FoldableAction.class
             )
         );
     }
