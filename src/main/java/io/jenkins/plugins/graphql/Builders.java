@@ -361,8 +361,8 @@ public class Builders {
         sb.append("}\n");
 
         sb.append("type QueryType {\n");
-        sb.append("  allItems(offset: Int, limit: Int, Type: String, id: String): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
-        sb.append("  allUsers(offset: Int, limit: Int, Type: String, id: String): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
+        sb.append("  allItems(offset: Int = 0, limit: Int = 100, Type: String, id: ID): [" + ClassUtils.getGraphQLClassName(AbstractItem.class) + "]\n");
+        sb.append("  allUsers(offset: Int = 0, limit: Int = 100, Type: String, id: ID): [" + ClassUtils.getGraphQLClassName(User.class)+ "]\n");
         for (RootAction action : rootActions) {
             sb.append("  " + getFieldNameForRootAction(action) + ": " + ClassUtils.getGraphQLClassName(action.getClass()) + "\n");
         }
