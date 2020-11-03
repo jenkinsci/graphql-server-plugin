@@ -1,0 +1,25 @@
+version: 2
+updates:
+- package-ecosystem: npm
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+- package-ecosystem: maven
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: org.apache.commons:commons-collections4
+    versions:
+    - "> 4.3"
+  - dependency-name: org.jenkins-ci.plugins:git
+    versions:
+    - "> 3.10.0"
+  - dependency-name: org.jenkins-ci.plugins.workflow:workflow-step-api
+    versions:
+    - "> 2.19"
+  - dependency-name: org.jenkins-ci:symbol-annotation
+    versions:
+    - "> 1.18"
