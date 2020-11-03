@@ -270,12 +270,17 @@ public class Builders {
     }
 
     private String getFieldNameForRootAction(RootAction action) {
-        return action.getUrlName().replaceAll("-", "_").replaceAll("/", "_");
+        if (action == null) { return ""; }
+        String urlName = action.getUrlName();
+        if (urlName == null) { return ""; }
+        return urlName.replaceAll("-", "_").replaceAll("/", "_");
     }
 
     @SuppressWarnings("rawtypes")
     public GraphQLSchema buildSchema() {
-        Pattern typeToInterface = Pattern.compile("^(?:type|interface) ([a-zA-Z0-9_]+)\\s*%s", Pattern.MULTILINE);
+        Jenkins j = Jenkins.getInstanceOrNull();
+        if (j == null) { return null; }
+//        Pattern typeToInterface = Pattern.compile("^(?:type|interface) ([a-zA-Z0-9_]+)\\s*%s", Pattern.MULTILINE);
 
         List<RootAction> rootActions = DescriptorExtensionList
             .lookup(RootAction.class)
@@ -299,7 +304,12 @@ public class Builders {
                 .map(i -> i.getKlass().toJavaClass())
                 .collect(Collectors.toList())
         );
-        classQueue.addAll(Jenkins.getInstanceOrNull().getExtensionList(Action.class).stream().map(i -> i.getClass()).collect(Collectors.toList()));
+        classQueue.addAll(
+            j.getExtensionList(Action.class)
+                .stream()
+                .map(i -> i.getClass())
+                .collect(Collectors.toList())
+        );
         classQueue.add(AbstractItem.class);
         classQueue.add(Job.class);
         classQueue.add(User.class);
@@ -321,7 +331,8 @@ public class Builders {
         sb.append("\n");
 
         Set<String> graphQLTypeStrings = new HashSet();
-        for (Class<?> interfaceClazz : this.graphQLTypes.keySet()) {
+        for (Map.Entry<Class, String> graphqlEntry : this.graphQLTypes.entrySet()) {
+            Class<?> interfaceClazz = graphqlEntry.getKey();
             List<String> interfaces = new LinkedList<>();
             for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
                 Class<?> instanceClazz = entry1.getKey();
@@ -368,12 +379,12 @@ public class Builders {
         }
         sb.append("}\n");
 
-        try {
-            Files.write(sb.toString().getBytes(), Paths.get("./schema.graphql").toFile());
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        // try {
+        //     Files.write(sb.toString().getBytes(), Paths.get("./schema.graphql").toFile());
+        // } catch (IOException e) {
+        //     // TODO Auto-generated catch block
+        //     e.printStackTrace();
+        // }
 
         TypeDefinitionRegistry typeRegistry = new SchemaParser().parse(sb.toString());
         RuntimeWiring.Builder runtimeWiring = RuntimeWiring.newRuntimeWiring();
