@@ -17,6 +17,7 @@ import net.sf.json.JSONObject;
 import org.apache.commons.io.IOUtils;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 
 import edu.umd.cs.findbugs.annotations.CheckForNull;
 import javax.servlet.ServletException;
@@ -81,7 +82,7 @@ public class GraphQLRootAction extends Actionable implements RootAction {
     }
 
     @SuppressWarnings("unused")
-    // @RequirePOST
+    @RequirePOST
     public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
         HashMap<String, Object> variables = new HashMap<>();
         HashMap<String, Object> context = new HashMap<>();
