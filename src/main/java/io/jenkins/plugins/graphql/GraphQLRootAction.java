@@ -32,7 +32,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Extension
-@SuppressWarnings("unused")
 public class GraphQLRootAction extends Actionable implements RootAction {
     private final static Logger LOGGER = Logger.getLogger(GraphQLRootAction.class.getName());
     private static GraphQL builtSchema;
@@ -81,7 +80,6 @@ public class GraphQLRootAction extends Actionable implements RootAction {
             return json.optString(key, defaultValue);
     }
 
-    @SuppressWarnings("unused")
     @RequirePOST
     public void doIndex(StaplerRequest req, StaplerResponse rsp) throws IOException {
         HashMap<String, Object> variables = new HashMap<>();
@@ -149,14 +147,12 @@ public class GraphQLRootAction extends Actionable implements RootAction {
         osw.close();
     }
 
-    @SuppressWarnings("unused")
     public void doClient(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         rsp.setStatus(HttpServletResponse.SC_OK);
         rsp.setContentType("text/html");
         req.getView(this, "client.jelly").forward(req, rsp);
     }
 
-    @SuppressWarnings("unused")
     public void doPlayground(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
         rsp.setStatus(HttpServletResponse.SC_OK);
         rsp.setContentType("text/html");

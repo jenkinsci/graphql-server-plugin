@@ -63,13 +63,13 @@ public class ClassUtils {
         return name;
     }
 
-    private static Set<Class> getAllClassesCache = null;
+    private static Set<Class<?>> getAllClassesCache = null;
 
     @VisibleForTesting
-    public static synchronized  void setAllClassesCache(Set<Class> data) {
+    public static synchronized  void setAllClassesCache(Set<Class<?>> data) {
         getAllClassesCache = data;
     }
-    private static Set<Class> getAllClasses() {
+    private static Set<Class<?>> getAllClasses() {
         if (getAllClassesCache != null) { return getAllClassesCache; }
         setAllClassesCache(new HashSet<>());
 
@@ -91,8 +91,8 @@ public class ClassUtils {
             boolean oldAccessible = f.isAccessible();
             f.setAccessible(true);
             for (ClassLoader classLoader : classLoadersList) {
-                ArrayList<Class> classes =  new ArrayList<>(
-                    (Vector<Class>) f.get(classLoader)
+                ArrayList<Class<?>> classes =  new ArrayList<>(
+                    (Vector<Class<?>>) f.get(classLoader)
                 );
                 getAllClassesCache.addAll(
                     classes
@@ -138,9 +138,9 @@ public class ClassUtils {
         return getAllClassesCache;
     }
 
-    public static Set<Class> findSubclasses(ModelBuilder modelBuilder, Class interfaceClass) {
-        Set<Class> subClasses = new HashSet<>();
-        for (Class clazz : getAllClasses()) {
+    public static Set<Class<?>> findSubclasses(ModelBuilder modelBuilder, Class<?> interfaceClass) {
+        Set<Class<?>> subClasses = new HashSet<>();
+        for (Class<?> clazz : getAllClasses()) {
             if (interfaceClass.isAssignableFrom(clazz)) {
                 try {
                     modelBuilder.get(clazz);

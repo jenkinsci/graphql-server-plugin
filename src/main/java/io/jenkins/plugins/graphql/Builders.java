@@ -3,7 +3,6 @@ package io.jenkins.plugins.graphql;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import com.google.common.io.Files;
 import graphql.Scalars;
 import graphql.schema.*;
 import graphql.schema.idl.*;
@@ -19,16 +18,13 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
-import java.io.IOException;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -97,12 +93,12 @@ public class Builders {
     }
 
     /*** DONE STATIC */
-    private HashMap<Class, String> graphQLTypes = new HashMap();
+    private HashMap<Class<?>, String> graphQLTypes = new HashMap<>();
     private HashMap<String, Property> propertyMap = new HashMap<>();
-    private PriorityQueue<Class> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
-    private List<Class> extraTopLevelClasses = new ArrayList<>();
+    private PriorityQueue<Class<?>> classQueue = new PriorityQueue<>(11, Comparator.comparing(Class::getName));
+    private List<Class<?>> extraTopLevelClasses = new ArrayList<>();
 
-    protected String createSchemaClassName(final Class clazz) {
+    protected String createSchemaClassName(final Class<?> clazz) {
         assert (clazz != null);
 
         if (javaTypesToGraphqlTypes.containsKey(clazz.getSimpleName())) {
@@ -125,12 +121,12 @@ public class Builders {
         return ClassUtils.getGraphQLClassName(clazz);
     }
 
-    private boolean isInterfaceOrAbstract(Class clazz) {
+    private boolean isInterfaceOrAbstract(Class<?> clazz) {
         return Modifier.isInterface(clazz.getModifiers())
             || Modifier.isAbstract(clazz.getModifiers());
     }
 
-    private Class getCollectionClass(final Property p) {
+    private Class<?> getCollectionClass(final Property p) {
         return TypeUtil
                 .erasure(TypeUtil.getTypeArgument(TypeUtil.getBaseClass(p.getGenericType(), Collection.class), 0));
     }
@@ -159,15 +155,15 @@ public class Builders {
     }
 
     @SuppressWarnings("squid:S135")
-    String buildGraphQLTypeFromModel(final Class clazz, final boolean isInterface) {
-        final Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class) null, (String) null);
+    String buildGraphQLTypeFromModel(final Class<?> clazz, final boolean isInterface) {
+        final Model<?> model = MODEL_BUILDER.getOrNull(clazz, (Class<?>) null, (String) null);
         String containerTypeName = ClassUtils.getGraphQLClassName(clazz);
 
         final StringBuilder sb = new StringBuilder();
 
         final Jenkins instance = Jenkins.getInstanceOrNull();
         if (instance != null) {
-            final Descriptor descriptor = instance.getDescriptor(clazz);
+            final Descriptor descriptor = instance.getDescriptor(clazz.getName());
             if (descriptor != null) {
                 // TODO - make test to check for display names having quotes in them
                 sb.append("\"" + descriptor.getDisplayName().replaceAll("\"", "\\\\\"")  + "\"\n");
@@ -200,7 +196,7 @@ public class Builders {
                     if (this.propertyMap.containsKey(containerTypeName + "#" + p.name)) {
                         continue;
                     }
-                    final Class propertyClazz = p.getType();
+                    final Class<?> propertyClazz = p.getType();
 
                     String className;
                     if ("id".equals(p.name)) {
@@ -226,9 +222,13 @@ public class Builders {
                     sb.append(p.name);
                     sb.append(": ");
                     sb.append(className);
+                    /*
+                     * High: Use of reflection to check for the presence the annotation edu.umd.cs.findbugs.annotations.NonNull which doesn't have runtime retention, in io.jenkins.plugins.graphql.Builders.buildGraphQLTypeFromModel(Class, boolean) [io.jenkins.plugins.graphql.Builders] At Builders.java:[line 225] DMI_ANNOTATION_IS_NOT_VISIBLE_TO_REFLECTION
+                     * TODO - find another way of figuring out non null?
                     if (propertyClazz.isAnnotationPresent(NonNull.class)) {
                         sb.append("!");
                     }
+                    */
                     sb.append("\n");
 
                     /*
@@ -301,7 +301,7 @@ public class Builders {
                 .stream()
 //                .map(i -> DescriptorExtensionList.lookup(i.getClass()))
 //                .flatMap(Collection::stream)
-                .map(i -> i.getKlass().toJavaClass())
+                .map(i -> (Class<?>) i.getKlass().toJavaClass())
                 .collect(Collectors.toList())
         );
         classQueue.addAll(
@@ -330,11 +330,11 @@ public class Builders {
 
         sb.append("\n");
 
-        Set<String> graphQLTypeStrings = new HashSet();
-        for (Map.Entry<Class, String> graphqlEntry : this.graphQLTypes.entrySet()) {
+        Set<String> graphQLTypeStrings = new HashSet<String>();
+        for (Map.Entry<Class<?>, String> graphqlEntry : this.graphQLTypes.entrySet()) {
             Class<?> interfaceClazz = graphqlEntry.getKey();
             List<String> interfaces = new LinkedList<>();
-            for (Map.Entry<Class, String> entry1 : this.graphQLTypes.entrySet()) {
+            for (Map.Entry<Class<?>, String> entry1 : this.graphQLTypes.entrySet()) {
                 Class<?> instanceClazz = entry1.getKey();
                 if (interfaceClazz == instanceClazz) {
                     continue;
@@ -411,7 +411,7 @@ public class Builders {
 
     private DataFetcher<Object> getObjectDataFetcher(Class<?> defaultClazz) {
         return dataFetchingEnvironment -> {
-            Class clazz = defaultClazz;
+            Class<?> clazz = defaultClazz;
             final Jenkins instance = Jenkins.getInstanceOrNull();
             final int offset = (int) dataFetchingEnvironment.getArguments().getOrDefault(ARG_OFFSET, 0);
             final int limit = (int) dataFetchingEnvironment.getArguments().getOrDefault(ARG_LIMIT, 100);
@@ -422,7 +422,7 @@ public class Builders {
                 clazz = Class.forName(clazzName);
             }
 
-            Iterable iterable;
+            Iterable<?> iterable;
             if (clazz == User.class) {
                 if (id != null && !id.isEmpty()) {
                     return Stream.of(User.get(id, false, Collections.emptyMap()))
@@ -446,7 +446,7 @@ public class Builders {
                 iterable = Items.allItems(
                     Jenkins.getAuthentication(),
                     Jenkins.getInstanceOrNull(),
-                    clazz
+                    (Class) clazz
                 );
             }
             return Lists.newArrayList(slice(iterable, offset, limit))
@@ -456,7 +456,7 @@ public class Builders {
         };
     }
 
-    public void addExtraTopLevelClasses(final List<Class> clazzes) {
+    public void addExtraTopLevelClasses(final List<Class<?>> clazzes) {
         this.extraTopLevelClasses.addAll(clazzes);
     }
 }

@@ -5,7 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class MockClassUtils {
-    public static Set<Class> mock_getAllClassesList() {
+    public static Set<Class<?>> mock_getAllClassesList() {
         return new HashSet<>(
             Arrays.asList(
                 GraphQLSchemaGeneratorTest.FakeRun.class,
