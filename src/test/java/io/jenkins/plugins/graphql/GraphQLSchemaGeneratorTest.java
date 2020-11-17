@@ -33,7 +33,7 @@ import org.jvnet.hudson.test.JenkinsRule;
 import org.kohsuke.stapler.export.ExportedBean;
 import org.mockito.Mockito;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Calendar;
@@ -57,7 +57,7 @@ public class GraphQLSchemaGeneratorTest {
 
     @ExportedBean
     public class FakeRun extends Run {
-        protected FakeRun(@Nonnull Job job, @Nonnull Calendar timestamp) {
+        protected FakeRun(@NonNull Job job, @NonNull Calendar timestamp) {
             super(job, timestamp);
         }
     }

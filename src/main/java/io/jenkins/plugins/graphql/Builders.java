@@ -19,8 +19,8 @@ import org.kohsuke.stapler.export.ModelBuilder;
 import org.kohsuke.stapler.export.Property;
 import org.kohsuke.stapler.export.TypeUtil;
 
-import javax.annotation.Nonnull;
 import java.io.IOException;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Paths;
@@ -226,7 +226,7 @@ public class Builders {
                     sb.append(p.name);
                     sb.append(": ");
                     sb.append(className);
-                    if (propertyClazz.isAnnotationPresent(Nonnull.class)) {
+                    if (propertyClazz.isAnnotationPresent(NonNull.class)) {
                         sb.append("!");
                     }
                     sb.append("\n");
