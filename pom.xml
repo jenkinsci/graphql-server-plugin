@@ -21,7 +21,7 @@
         <npm.version>6.10.0</npm.version>
         <httpclient.verison>4.5.12</httpclient.verison>
         <sl4j.version>1.7.26</sl4j.version>
-        <antlr4.version>4.7.2</antlr4.version>
+        <antlr4.version>4.9</antlr4.version>
     </properties>
     <name>GraphQL API Server</name>
     <description>A GraphQL implementation of the Jenkins API</description>
