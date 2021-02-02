@@ -60,7 +60,7 @@
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>graphql-java</artifactId>
-            <version>2020-07-03T01-10-37-bb87d8f</version>
+            <version>2021-02-02T04-19-10-0e6921e1</version>
         </dependency>
         <dependency>
             <groupId>org.antlr</groupId>
