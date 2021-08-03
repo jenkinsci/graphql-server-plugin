@@ -70,7 +70,7 @@
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>graphql-java-extended-scalars</artifactId>
-            <version>2020-02-19T04-04-26-6f82be9</version>
+            <version>2021-08-03T09-10-50-aff4d46</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
