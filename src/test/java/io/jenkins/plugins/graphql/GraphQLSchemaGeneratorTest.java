@@ -1,8 +1,8 @@
 package io.jenkins.plugins.graphql;
 
 import com.cloudbees.plugins.credentials.ViewCredentialsAction;
-import com.gargoylesoftware.htmlunit.HttpMethod;
-import com.gargoylesoftware.htmlunit.WebRequest;
+import org.htmlunit.HttpMethod;
+import org.htmlunit.WebRequest;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
